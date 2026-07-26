@@ -1,13 +1,17 @@
-name: Read Telegram Message
-
-on:
-  workflow_dispatch:
-
-jobs:
-  read-message:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Get latest message from Telegram
-        run: |
-          curl -s "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/getUpdates" > updates.json
-          cat updates.json
+name: Read Telegram Message  
+  
+on:  
+  workflow_dispatch:  
+  
+jobs:  
+  read-message:  
+    runs-on: ubuntu-latest  
+    steps:  
+      - name: Get latest message from Telegram  
+        run: |  
+          curl -s "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/getUpdates" > updates.json  
+  
+      - name: Extract clean message text  
+        run: |  
+          MESSAGE=$(cat updates.json | jq -r '.result[-1].message.text')  
+          echo "Extracted message: $MESSAGE"  
