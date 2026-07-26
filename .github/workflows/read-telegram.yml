@@ -1,33 +1,74 @@
-name: Read Telegram Message
+name: Read Telegram Message & Generate Instagram Post
 
 on:
   workflow_dispatch:
 
 jobs:
-  read-message:
+  read-and-generate:
     runs-on: ubuntu-latest
-
     steps:
       - name: Get latest message from Telegram
         run: |
           curl -s "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/getUpdates" > updates.json
 
-      - name: Extract clean message text
+      - name: Process Message and Run AI Brain
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
-          MESSAGE=$(cat updates.json | jq -r '.result[-1].message.text')
-          echo "Extracted message: $MESSAGE"
-          echo "MESSAGE=$MESSAGE" >> $GITHUB_ENV
+          python3 -c "
+          import os, json, urllib.request
 
-      - name: Check command
-        run: |
-          if [ "$MESSAGE" = "Create today's Instagram post" ]; then
-            echo "Command recognized: create_post"
-            curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
-              -d chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
-              -d text="✅ Command recognized: Create today's Instagram post. (Next steps not built yet.)"
-          else
-            echo "No matching command found for: $MESSAGE"
-            curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
-              -d chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
-              -d text="❓ I don't recognize that command yet: $MESSAGE"
-          fi
+          # Load Telegram updates
+          with open('updates.json', 'r') as f:
+              updates = json.load(f)
+
+          bot_token = os.environ['TELEGRAM_BOT_TOKEN']
+          chat_id = os.environ['TELEGRAM_CHAT_ID']
+          gemini_key = os.environ['GEMINI_API_KEY']
+
+          try:
+              message = updates['result'][-1]['message']['text'].strip()
+          except Exception:
+              message = ''
+
+          def send_telegram(text):
+              url = f'https://api.telegram.org/bot{bot_token}/sendMessage'
+              payload = json.dumps({'chat_id': chat_id, 'text': text}).encode('utf-8')
+              req = urllib.request.Request(url, data=payload, headers={'Content-Type': 'application/json'})
+              urllib.request.urlopen(req)
+
+          if message == \"Create today's Instagram post\":
+              send_telegram('🤖 Command Recognized! Generating Instagram Post with AI Brain...')
+              
+              # Call Gemini API
+              prompt = (
+                  'You are Hermes Agent, an expert AI Instagram Content Creator. '
+                  'Generate an engaging Instagram post about a modern AI or Tech topic. '
+                  'Include:\\n'
+                  '1. Catchy Headline\\n'
+                  '2. Engaging Caption (with emojis)\\n'
+                  '3. 5-10 Relevant Hashtags\\n'
+                  '4. An AI Image Generation Prompt (for Midjourney/Flux).\\n'
+                  'Keep formatting clean and readable.'
+              )
+              
+              gemini_url = f'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={gemini_key}'
+              gemini_payload = json.dumps({
+                  'contents': [{'parts': [{'text': prompt}]}]
+              }).encode('utf-8')
+
+              try:
+                  req = urllib.request.Request(gemini_url, data=gemini_payload, headers={'Content-Type': 'application/json'})
+                  response = urllib.request.urlopen(req)
+                  res_data = json.loads(response.read().decode('utf-8'))
+                  ai_post = res_data['candidates'][0]['content']['parts'][0]['text']
+                  
+                  # Send generated post to Telegram
+                  send_telegram(f'✨ HERMES AGENT POST GENERATED ✨\\n\\n{ai_post}')
+              except Exception as e:
+                  send_telegram(f'⚠️ Error from AI Brain: {str(e)}')
+          else:
+              send_telegram(f'❓ Unrecognized Command: \"{message}\"')
+          "
