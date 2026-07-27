@@ -8,15 +8,16 @@ BOT_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
 CHAT_ID = os.environ["TELEGRAM_CHAT_ID"]
 GEMINI_API_KEY = os.environ["GEMINI_API_KEY"]
 
+# Active Gemini 2.0 Flash Model
 GEMINI_URL = (
     "https://generativelanguage.googleapis.com/v1beta/models/"
-    f"gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
+    f"gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}"
 )
 
 
 def send_telegram_message(text):
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-    text = text[:4000]  # Telegram's message length limit
+    text = text[:4000]  # Telegram message length limit
     data = urllib.parse.urlencode({
         "chat_id": CHAT_ID,
         "text": text
@@ -77,7 +78,7 @@ def generate_instagram_post():
         error_body = e.read().decode()
         print(f"ERROR Gemini HTTP {e.code}: {error_body}")
         send_telegram_message(
-            f"⚠️ Gemini API error (HTTP {e.code}). Check the Actions log for details."
+            f"⚠️ Gemini API error (HTTP {e.code}): {error_body[:150]}"
         )
     except Exception as e:
         print(f"ERROR calling Gemini: {e}")
