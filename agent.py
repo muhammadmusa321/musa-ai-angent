@@ -1,5 +1,6 @@
 import json
 import os
+import time
 import urllib.request
 import urllib.parse
 import urllib.error
@@ -8,16 +9,10 @@ BOT_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
 CHAT_ID = os.environ["TELEGRAM_CHAT_ID"]
 GEMINI_API_KEY = os.environ["GEMINI_API_KEY"]
 
-# Active Gemini 2.0 Flash Model
-GEMINI_URL = (
-    "https://generativelanguage.googleapis.com/v1beta/models/"
-    f"gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}"
-)
-
 
 def send_telegram_message(text):
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-    text = text[:4000]  # Telegram message length limit
+    text = text[:4000]
     data = urllib.parse.urlencode({
         "chat_id": CHAT_ID,
         "text": text
@@ -61,28 +56,39 @@ def generate_instagram_post():
         ]
     }).encode()
 
-    try:
-        req = urllib.request.Request(
-            GEMINI_URL,
-            data=payload,
-            headers={"Content-Type": "application/json"}
-        )
-        with urllib.request.urlopen(req, timeout=60) as resp:
-            result = json.loads(resp.read().decode())
+    # Try multiple free Gemini models if one is rate-limited
+    models = ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-flash-latest"]
+    generated_text = None
+    last_error = ""
 
-        generated_text = result["candidates"][0]["content"]["parts"][0]["text"]
+    for model_name in models:
+        gemini_url = (
+            "https://generativelanguage.googleapis.com/v1beta/models/"
+            f"{model_name}:generateContent?key={GEMINI_API_KEY}"
+        )
+        try:
+            req = urllib.request.Request(
+                gemini_url,
+                data=payload,
+                headers={"Content-Type": "application/json"}
+            )
+            with urllib.request.urlopen(req, timeout=60) as resp:
+                result = json.loads(resp.read().decode())
+            generated_text = result["candidates"][0]["content"]["parts"][0]["text"]
+            if generated_text:
+                break
+        except urllib.error.HTTPError as e:
+            error_body = e.read().decode()
+            last_error = f"{model_name} (HTTP {e.code}): {error_body[:100]}"
+            time.sleep(2)
+        except Exception as e:
+            last_error = str(e)
+
+    if generated_text:
         print(f"Gemini response:\n{generated_text}")
         send_telegram_message(f"✅ Today's Instagram post:\n\n{generated_text}")
-
-    except urllib.error.HTTPError as e:
-        error_body = e.read().decode()
-        print(f"ERROR Gemini HTTP {e.code}: {error_body}")
-        send_telegram_message(
-            f"⚠️ Gemini API error (HTTP {e.code}): {error_body[:150]}"
-        )
-    except Exception as e:
-        print(f"ERROR calling Gemini: {e}")
-        send_telegram_message(f"⚠️ Error generating content: {e}")
+    else:
+        send_telegram_message(f"⚠️ Gemini API rate-limited: {last_error}")
 
 
 def main():
