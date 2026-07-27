@@ -55,13 +55,12 @@ jobs:
                   'Keep formatting clean and readable.'
               )
 
-              # Official Google Gemini REST API endpoints
-              models = ['gemini-1.5-flash', 'gemini-2.0-flash', 'gemini-1.5-pro']
+              # Active Gemini 2.0 & 1.5 Models
+              models = ['gemini-2.0-flash', 'gemini-1.5-flash']
               ai_post = None
               error_log = []
 
               for m in models:
-                  # Using official x-goog-api-key header
                   url = f'https://generativelanguage.googleapis.com/v1beta/models/{m}:generateContent'
                   headers = {'Content-Type': 'application/json', 'x-goog-api-key': gemini_key}
                   payload = json.dumps({'contents': [{'parts': [{'text': prompt}]}]}).encode('utf-8')
