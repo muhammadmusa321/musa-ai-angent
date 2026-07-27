@@ -18,7 +18,7 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
           python3 -c "
-          import os, json, urllib.request, urllib.error
+          import os, json, time, urllib.request, urllib.error
 
           with open('updates.json', 'r') as f:
               updates = json.load(f)
@@ -55,8 +55,8 @@ jobs:
                   'Keep formatting clean and readable.'
               )
 
-              # Active Gemini 2.0 & 1.5 Models
-              models = ['gemini-2.0-flash', 'gemini-1.5-flash']
+              # High quota models first
+              models = ['gemini-1.5-flash', 'gemini-2.0-flash', 'gemini-1.5-pro']
               ai_post = None
               error_log = []
 
@@ -75,6 +75,7 @@ jobs:
                   except urllib.error.HTTPError as e:
                       body = e.read().decode('utf-8')
                       error_log.append(f'{m} (HTTP {e.code}): {body}')
+                      time.sleep(2)
                   except Exception as e:
                       error_log.append(f'{m}: {str(e)}')
 
