@@ -8,10 +8,9 @@ import urllib.error
 BOT_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
 CHAT_ID = os.environ["TELEGRAM_CHAT_ID"]
 GEMINI_API_KEY = os.environ["GEMINI_API_KEY"]
+SHEETS_WEBHOOK_URL = os.environ["SHEETS_WEBHOOK_URL"]
 
-# Tried in order. Each has its own separate free-tier quota (Google tracks
-# rate limits per model, not just per key), so falling back to the next
-# model on a 429 is a genuine workaround, not just a repeat of the same call.
+# Tried in order. Each has its own separate free-tier quota.
 MODEL_FALLBACK_ORDER = [
     "gemini-2.0-flash",
     "gemini-1.5-flash",
@@ -24,7 +23,7 @@ BASE_BACKOFF_SECONDS = 5
 
 def send_telegram_message(text):
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-    text = text[:4000]  # Telegram's message length limit
+    text = text[:4000]  # Telegram message length limit
     data = urllib.parse.urlencode({
         "chat_id": CHAT_ID,
         "text": text
@@ -52,12 +51,6 @@ def get_latest_message():
 
 
 def call_gemini_model(model, prompt):
-    """
-    Calls one Gemini model with retry + exponential backoff on 429.
-    Returns the generated text on success.
-    Raises RuntimeError if this model is exhausted after retries,
-    so the caller can move on to the next model in the fallback list.
-    """
     url = (
         "https://generativelanguage.googleapis.com/v1beta/models/"
         f"{model}:generateContent?key={GEMINI_API_KEY}"
@@ -92,8 +85,6 @@ def call_gemini_model(model, prompt):
                 else:
                     raise RuntimeError(f"{model} exhausted after {MAX_RETRIES_PER_MODEL} attempts (429)")
             else:
-                # Non-429 HTTP error (bad request, invalid model name, etc.)
-                # No point retrying this model — fail fast to the next one.
                 raise RuntimeError(f"{model} failed with HTTP {e.code}: {error_body}")
 
         except Exception as e:
@@ -104,6 +95,56 @@ def call_gemini_model(model, prompt):
             raise RuntimeError(f"{model} failed after {MAX_RETRIES_PER_MODEL} attempts: {e}")
 
     raise RuntimeError(f"{model} failed for an unknown reason")
+
+
+def parse_post_sections(generated_text):
+    sections = {"headline": "", "caption": "", "hashtags": "", "image_prompt": ""}
+    current_key = None
+    label_map = {
+        "HEADLINE:": "headline",
+        "CAPTION:": "caption",
+        "HASHTAGS:": "hashtags",
+        "IMAGE_PROMPT:": "image_prompt",
+    }
+
+    for line in generated_text.splitlines():
+        stripped = line.strip()
+        matched = False
+        for label, key in label_map.items():
+            if stripped.startswith(label):
+                current_key = key
+                sections[key] = stripped[len(label):].strip()
+                matched = True
+                break
+        if not matched and current_key and stripped:
+            sections[current_key] += " " + stripped
+
+    return sections
+
+
+def log_to_sheets(command, model, sections):
+    payload = json.dumps({
+        "command": command,
+        "model": model,
+        "headline": sections.get("headline", ""),
+        "caption": sections.get("caption", ""),
+        "hashtags": sections.get("hashtags", ""),
+        "image_prompt": sections.get("image_prompt", ""),
+    }).encode()
+
+    try:
+        req = urllib.request.Request(
+            SHEETS_WEBHOOK_URL,
+            data=payload,
+            headers={"Content-Type": "application/json"}
+        )
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            resp.read()
+        print("Logged to Google Sheets successfully.")
+        return True
+    except Exception as e:
+        print(f"ERROR logging to Sheets: {e}")
+        return False
 
 
 def generate_instagram_post():
@@ -124,14 +165,18 @@ def generate_instagram_post():
             print(f"Trying model: {model}")
             generated_text = call_gemini_model(model, prompt)
             print(f"Success with {model}:\n{generated_text}")
-            send_telegram_message(f"✅ Today's Instagram post (via {model}):\n\n{generated_text}")
+
+            sections = parse_post_sections(generated_text)
+            logged = log_to_sheets("Create today's Instagram post", model, sections)
+
+            log_note = "📝 Logged to memory." if logged else "⚠️ Post generated, but logging to Sheets failed (check Actions log)."
+            send_telegram_message(f"✅ Today's Instagram post (via {model}):\n\n{generated_text}\n\n{log_note}")
             return
         except RuntimeError as e:
             print(f"Model {model} failed: {e}")
             last_error = e
             continue
 
-    # If we reach here, every model in the fallback list failed
     send_telegram_message(
         "⚠️ All AI models are currently rate-limited or unavailable on the "
         "free tier. This usually clears within a minute (per-minute limit) "
