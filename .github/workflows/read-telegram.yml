@@ -1,86 +1,110 @@
-name: Read Telegram Message & Generate Instagram Post
-
-on:
-  workflow_dispatch:
-
-jobs:
-  read-and-generate:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Get latest message from Telegram
-        run: |
-          curl -s "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/getUpdates" > updates.json
-
-      - name: Process Message and Run AI Brain
-        env:
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-        run: |
-          python3 -c "
-          import os, json, urllib.request, urllib.error
-
-          with open('updates.json', 'r') as f:
-              updates = json.load(f)
-
-          bot_token = os.environ.get('TELEGRAM_BOT_TOKEN', '').strip()
-          chat_id = os.environ.get('TELEGRAM_CHAT_ID', '').strip()
-          gemini_key = os.environ.get('GEMINI_API_KEY', '').strip()
-
-          try:
-              message = updates['result'][-1]['message']['text'].strip()
-          except Exception:
-              message = ''
-
-          def send_telegram(text):
-              url = f'https://api.telegram.org/bot{bot_token}/sendMessage'
-              payload = json.dumps({'chat_id': chat_id, 'text': text}).encode('utf-8')
-              req = urllib.request.Request(url, data=payload, headers={'Content-Type': 'application/json'})
-              try:
-                  urllib.request.urlopen(req)
-              except Exception as e:
-                  print('TG Error:', e)
-
-          if message == \"Create today's Instagram post\":
-              send_telegram('🤖 Command Recognized! Generating Instagram Post with AI Brain...')
-
-              prompt = (
-                  'You are Hermes Agent, an expert AI Instagram Content Creator. '
-                  'Generate an engaging Instagram post about a modern AI or Tech topic. '
-                  'Include:\\n'
-                  '1. Catchy Headline\\n'
-                  '2. Engaging Caption (with emojis)\\n'
-                  '3. 5-10 Relevant Hashtags\\n'
-                  '4. An AI Image Generation Prompt (for Midjourney/Flux).\\n'
-                  'Keep formatting clean and readable.'
-              )
-
-              # Exact Stable Gemini Models
-              models = ['gemini-2.0-flash', 'gemini-1.5-flash-latest', 'gemini-1.5-flash']
-              ai_post = None
-              error_msg = ''
-
-              for m in models:
-                  url = f'https://generativelanguage.googleapis.com/v1beta/models/{m}:generateContent?key={gemini_key}'
-                  payload = json.dumps({'contents': [{'parts': [{'text': prompt}]}]}).encode('utf-8')
-                  
-                  try:
-                      req = urllib.request.Request(url, data=payload, headers={'Content-Type': 'application/json'})
-                      res = urllib.request.urlopen(req)
-                      data = json.loads(res.read().decode('utf-8'))
-                      ai_post = data['candidates'][0]['content']['parts'][0]['text']
-                      if ai_post:
-                          break
-                  except urllib.error.HTTPError as e:
-                      body = e.read().decode('utf-8')
-                      error_msg = f'{m}: HTTP {e.code} - {body[:150]}'
-                  except Exception as e:
-                      error_msg = str(e)
-
-              if ai_post:
-                  send_telegram(f'✨ HERMES AGENT POST GENERATED ✨\\n\\n{ai_post}')
-              else:
-                  send_telegram(f'⚠️ Error from AI Brain:\\n{error_msg}')
-          else:
-              send_telegram(f'❓ Unrecognized Command: \"{message}\"')
-          "
+name: Read Telegram Message  
+  
+on:  
+  workflow_dispatch:  
+  
+jobs:  
+  read-message:  
+    runs-on: ubuntu-latest  
+    steps:  
+      - name: Get latest message from Telegram  
+        run: |  
+          curl -s "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/getUpdates" > updates.json  
+  
+      - name: Process message and generate content  
+        env:  
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}  
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}  
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}  
+        run: |  
+          python3 << 'EOF'  
+          import json  
+          import os  
+          import urllib.request  
+          import urllib.parse  
+          import urllib.error  
+  
+          BOT_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]  
+          CHAT_ID = os.environ["TELEGRAM_CHAT_ID"]  
+          GEMINI_API_KEY = os.environ["GEMINI_API_KEY"]  
+  
+          def send_telegram_message(text):  
+              url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"  
+              # Telegram messages have a 4096 character limit  
+              text = text[:4000]  
+              data = urllib.parse.urlencode({  
+                  "chat_id": CHAT_ID,  
+                  "text": text  
+              }).encode()  
+              try:  
+                  req = urllib.request.Request(url, data=data)  
+                  with urllib.request.urlopen(req, timeout=30) as resp:  
+                      resp.read()  
+                  print(f"Sent to Telegram: {text[:80]}...")  
+              except Exception as e:  
+                  print(f"ERROR sending to Telegram: {e}")  
+  
+          # Step 1: Extract latest message  
+          try:  
+              with open("updates.json", "r") as f:  
+                  updates = json.load(f)  
+              message = updates["result"][-1]["message"]["text"]  
+              print(f"Extracted message: {message}")  
+          except Exception as e:  
+              print(f"ERROR extracting message: {e}")  
+              send_telegram_message(f"⚠️ Error reading Telegram message: {e}")  
+              raise SystemExit(1)  
+  
+          # Step 2: Check command  
+          if message.strip() == "Create today's Instagram post":  
+              send_telegram_message("🤖 Got it — generating today's Instagram post now...")  
+  
+              prompt = (  
+                  "Generate content for an Instagram post from an AI-persona lifestyle "  
+                  "account. Respond in exactly this format:\n\n"  
+                  "HEADLINE: <a short catchy headline>\n\n"  
+                  "CAPTION: <an engaging Instagram caption, 2-4 sentences, with relevant emojis>\n\n"  
+                  "HASHTAGS: <5 to 10 relevant hashtags, space separated>\n\n"  
+                  "IMAGE_PROMPT: <a detailed prompt suitable for an AI image generator "  
+                  "to create the accompanying visual>"  
+              )  
+  
+              gemini_url = (  
+                  "https://generativelanguage.googleapis.com/v1beta/models/"  
+                  f"gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}"  
+              )  
+  
+              payload = json.dumps({  
+                  "contents": [  
+                      {"parts": [{"text": prompt}]}  
+                  ]  
+              }).encode()  
+  
+              try:  
+                  req = urllib.request.Request(  
+                      gemini_url,  
+                      data=payload,  
+                      headers={"Content-Type": "application/json"}  
+                  )  
+                  with urllib.request.urlopen(req, timeout=60) as resp:  
+                      result = json.loads(resp.read().decode())  
+  
+                  generated_text = result["candidates"][0]["content"]["parts"][0]["text"]  
+                  print(f"Gemini response:\n{generated_text}")  
+                  send_telegram_message(f"✅ Today's Instagram post:\n\n{generated_text}")  
+  
+              except urllib.error.HTTPError as e:  
+                  error_body = e.read().decode()  
+                  print(f"ERROR Gemini HTTP {e.code}: {error_body}")  
+                  send_telegram_message(  
+                      f"⚠️ Gemini API error (HTTP {e.code}). Check the Actions log for details."  
+                  )  
+              except Exception as e:  
+                  print(f"ERROR calling Gemini: {e}")  
+                  send_telegram_message(f"⚠️ Error generating content: {e}")  
+  
+          else:  
+              print(f"No matching command found for: {message}")  
+              send_telegram_message(f"❓ Unrecognized Command: {message}")  
+  
+          EOF  
