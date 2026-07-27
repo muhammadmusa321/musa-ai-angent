@@ -18,15 +18,14 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
           python3 -c "
-          import os, json, urllib.request
+          import os, json, urllib.request, urllib.error
 
-          # Load Telegram updates
           with open('updates.json', 'r') as f:
               updates = json.load(f)
 
-          bot_token = os.environ['TELEGRAM_BOT_TOKEN'].strip()
-          chat_id = os.environ['TELEGRAM_CHAT_ID'].strip()
-          gemini_key = os.environ['GEMINI_API_KEY'].strip()
+          bot_token = os.environ.get('TELEGRAM_BOT_TOKEN', '').strip()
+          chat_id = os.environ.get('TELEGRAM_CHAT_ID', '').strip()
+          gemini_key = os.environ.get('GEMINI_API_KEY', '').strip()
 
           try:
               message = updates['result'][-1]['message']['text'].strip()
@@ -37,11 +36,17 @@ jobs:
               url = f'https://api.telegram.org/bot{bot_token}/sendMessage'
               payload = json.dumps({'chat_id': chat_id, 'text': text}).encode('utf-8')
               req = urllib.request.Request(url, data=payload, headers={'Content-Type': 'application/json'})
-              urllib.request.urlopen(req)
+              try:
+                  urllib.request.urlopen(req)
+              except Exception as e:
+                  print('Telegram Send Error:', e)
 
           if message == \"Create today's Instagram post\":
               send_telegram('🤖 Command Recognized! Generating Instagram Post with AI Brain...')
               
+              if not gemini_key.startswith('AIzaSy'):
+                  send_telegram('⚠️ Warning: GEMINI_API_KEY does not start with AIzaSy. Please re-copy from AI Studio!')
+
               prompt = (
                   'You are Hermes Agent, an expert AI Instagram Content Creator. '
                   'Generate an engaging Instagram post about a modern AI or Tech topic. '
@@ -53,10 +58,9 @@ jobs:
                   'Keep formatting clean and readable.'
               )
               
-              # Fallback models list to avoid 404
-              models = ['gemini-1.5-flash-latest', 'gemini-1.5-flash', 'gemini-2.0-flash', 'gemini-2.5-flash', 'gemini-pro']
+              models = ['gemini-1.5-flash', 'gemini-1.5-flash-latest', 'gemini-2.0-flash', 'gemini-pro']
               ai_post = None
-              last_error = None
+              error_details = ''
 
               for m in models:
                   url = f'https://generativelanguage.googleapis.com/v1beta/models/{m}:generateContent?key={gemini_key}'
@@ -68,13 +72,16 @@ jobs:
                       ai_post = data['candidates'][0]['content']['parts'][0]['text']
                       if ai_post:
                           break
+                  except urllib.error.HTTPError as e:
+                      error_body = e.read().decode('utf-8')
+                      error_details = f'HTTP {e.code}: {error_body[:150]}'
                   except Exception as e:
-                      last_error = str(e)
+                      error_details = str(e)
 
               if ai_post:
                   send_telegram(f'✨ HERMES AGENT POST GENERATED ✨\\n\\n{ai_post}')
               else:
-                  send_telegram(f'⚠️ Error from AI Brain: {last_error}. Please double check GEMINI_API_KEY in GitHub secrets.')
+                  send_telegram(f'⚠️ Error from AI Brain: {error_details}')
           else:
               send_telegram(f'❓ Unrecognized Command: \"{message}\"')
           "
