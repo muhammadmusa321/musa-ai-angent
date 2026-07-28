@@ -10,7 +10,6 @@ CHAT_ID = os.environ["TELEGRAM_CHAT_ID"]
 GEMINI_API_KEY = os.environ["GEMINI_API_KEY"]
 SHEETS_WEBHOOK_URL = os.environ["SHEETS_WEBHOOK_URL"]
 
-# Tried in order. Each has its own separate free-tier quota.
 MODEL_FALLBACK_ORDER = [
     "gemini-2.0-flash",
     "gemini-1.5-flash",
@@ -23,7 +22,7 @@ BASE_BACKOFF_SECONDS = 5
 
 def send_telegram_message(text):
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-    text = text[:4000]  # Telegram message length limit
+    text = text[:4000]
     data = urllib.parse.urlencode({
         "chat_id": CHAT_ID,
         "text": text
@@ -35,6 +34,24 @@ def send_telegram_message(text):
         print(f"Sent to Telegram: {text[:80]}...")
     except Exception as e:
         print(f"ERROR sending to Telegram: {e}")
+
+
+def send_telegram_photo(photo_url, caption=""):
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendPhoto"
+    data = urllib.parse.urlencode({
+        "chat_id": CHAT_ID,
+        "photo": photo_url,
+        "caption": caption[:1024]
+    }).encode()
+    try:
+        req = urllib.request.Request(url, data=data)
+        with urllib.request.urlopen(req, timeout=60) as resp:
+            resp.read()
+        print(f"Sent photo to Telegram: {photo_url}")
+        return True
+    except Exception as e:
+        print(f"ERROR sending photo to Telegram: {e}")
+        return False
 
 
 def get_latest_message():
@@ -122,7 +139,15 @@ def parse_post_sections(generated_text):
     return sections
 
 
-def log_to_sheets(command, model, sections):
+def build_image_url(image_prompt):
+    encoded_prompt = urllib.parse.quote(image_prompt)
+    return (
+        f"https://image.pollinations.ai/prompt/{encoded_prompt}"
+        "?width=1024&height=1024&nologo=true"
+    )
+
+
+def log_to_sheets(command, model, sections, image_url):
     payload = json.dumps({
         "command": command,
         "model": model,
@@ -130,6 +155,7 @@ def log_to_sheets(command, model, sections):
         "caption": sections.get("caption", ""),
         "hashtags": sections.get("hashtags", ""),
         "image_prompt": sections.get("image_prompt", ""),
+        "image_url": image_url,
     }).encode()
 
     try:
@@ -167,10 +193,23 @@ def generate_instagram_post():
             print(f"Success with {model}:\n{generated_text}")
 
             sections = parse_post_sections(generated_text)
-            logged = log_to_sheets("Create today's Instagram post", model, sections)
+
+            image_url = ""
+            photo_sent = False
+            if sections.get("image_prompt"):
+                image_url = build_image_url(sections["image_prompt"])
+                print(f"Generated image URL: {image_url}")
+                photo_caption = sections.get("headline", "")[:1024]
+                photo_sent = send_telegram_photo(image_url, caption=photo_caption)
+
+            logged = log_to_sheets("Create today's Instagram post", model, sections, image_url)
 
             log_note = "📝 Logged to memory." if logged else "⚠️ Post generated, but logging to Sheets failed (check Actions log)."
-            send_telegram_message(f"✅ Today's Instagram post (via {model}):\n\n{generated_text}\n\n{log_note}")
+            image_note = "" if photo_sent else "\n⚠️ Image could not be sent to Telegram (check Actions log)."
+
+            send_telegram_message(
+                f"✅ Today's Instagram post (via {model}):\n\n{generated_text}\n\n{log_note}{image_note}"
+            )
             return
         except RuntimeError as e:
             print(f"Model {model} failed: {e}")
