@@ -1,5 +1,6 @@
 import json
 import os
+import random
 import time
 import urllib.request
 import urllib.parse
@@ -18,6 +19,18 @@ MODEL_FALLBACK_ORDER = [
 
 MAX_RETRIES_PER_MODEL = 3
 BASE_BACKOFF_SECONDS = 5
+
+
+def load_persona():
+    try:
+        with open("persona.json", "r") as f:
+            return json.load(f)
+    except Exception as e:
+        print(f"Warning: Could not load persona.json ({e}), using default fallback.")
+        return {
+            "system_prompt": "Generate an engaging Instagram post about modern AI tools and automation.",
+            "image_style_prefix": "3D dark-mode minimalist tech graphic, glowing neon style: "
+        }
 
 
 def send_telegram_message(text):
@@ -39,7 +52,7 @@ def send_telegram_message(text):
 def send_telegram_photo(photo_url, caption=""):
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendPhoto"
     
-    # Method 1: Direct URL to Telegram API
+    # Direct URL send
     data = urllib.parse.urlencode({
         "chat_id": CHAT_ID,
         "photo": photo_url,
@@ -54,7 +67,7 @@ def send_telegram_photo(photo_url, caption=""):
     except Exception as e:
         print(f"URL photo send failed: {e}")
 
-    # Method 2: Download image bytes and upload
+    # Bytes download fallback
     try:
         req = urllib.request.Request(photo_url, headers={"User-Agent": "Mozilla/5.0"})
         with urllib.request.urlopen(req, timeout=35) as resp:
@@ -165,12 +178,13 @@ def parse_post_sections(generated_text):
     return sections
 
 
-def build_image_url(image_prompt):
-    short_prompt = image_prompt[:200]
-    encoded_prompt = urllib.parse.quote(short_prompt)
+def build_image_url(image_prompt, style_prefix=""):
+    combined_prompt = f"{style_prefix} {image_prompt}"[:250]
+    encoded_prompt = urllib.parse.quote(combined_prompt)
+    random_seed = random.randint(1000, 999999)
     return (
         f"https://image.pollinations.ai/prompt/{encoded_prompt}"
-        "?width=1024&height=1024&nologo=true&model=flux"
+        f"?width=1024&height=1024&nologo=true&model=flux&seed={random_seed}"
     )
 
 
@@ -201,15 +215,15 @@ def log_to_sheets(command, model, sections, image_url):
 
 
 def generate_instagram_post():
+    persona = load_persona()
+    
     prompt = (
-        "You are the official AI Content Creator for 'Muhammad Musa' (@muhammad_musa125001), "
-        "a top AI Creator and Automation Specialist. Generate a viral, professional Instagram post "
-        "about AI tools, content automation, AI agents, or futuristic tech updates.\n\n"
+        f"{persona.get('system_prompt', '')}\n\n"
         "Respond in EXACTLY this format:\n\n"
         "HEADLINE: <a short, punchy 3-6 word viral tech headline>\n\n"
-        "CAPTION: <an engaging, high-value caption explaining the AI tool or concept with 3 key bullet points, relevant emojis, and a strong Call-To-Action asking followers to SAVE or SHARE this post>\n\n"
-        "HASHTAGS: #AICreator #AITools #Automation #AIAgents #NoCode #TechUpdates #ArtificialIntelligence #ContentAutomation #BuildInPublic #PakistanTech\n\n"
-        "IMAGE_PROMPT: <a detailed prompt for a 3D dark-mode minimalist tech infographic poster, featuring glowing neon blue and purple UI elements, sleek futuristic digital icons, 8k resolution, cinematic lighting, modern cyber graphic design>"
+        "CAPTION: <an engaging caption explaining the AI concept with 3 key bullet points, emojis, and a strong Call-To-Action asking followers to SAVE or SHARE>\n\n"
+        "HASHTAGS: #AICreator #AITools #Automation #AIAgents #NoCode #TechUpdates #BuildInPublic #PakistanTech\n\n"
+        "IMAGE_PROMPT: <a concise description of visual icons, UI diagrams, or futuristic 3D nodes for this post>"
     )
 
     last_error = None
@@ -225,7 +239,8 @@ def generate_instagram_post():
             image_url = ""
             photo_sent = False
             if sections.get("image_prompt"):
-                image_url = build_image_url(sections["image_prompt"])
+                style_prefix = persona.get("image_style_prefix", "")
+                image_url = build_image_url(sections["image_prompt"], style_prefix)
                 print(f"Generated image URL: {image_url}")
                 photo_caption = sections.get("headline", "")[:1024]
                 photo_sent = send_telegram_photo(image_url, caption=photo_caption)
@@ -244,9 +259,7 @@ def generate_instagram_post():
             last_error = e
             continue
 
-    send_telegram_message(
-        f"⚠️ All AI models failed. Last error: {last_error}"
-    )
+    send_telegram_message(f"⚠️ All AI models failed. Last error: {last_error}")
 
 
 def main():
