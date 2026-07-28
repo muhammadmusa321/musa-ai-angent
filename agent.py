@@ -37,17 +37,31 @@ def send_telegram_message(text):
 
 
 def send_telegram_photo(photo_url, caption=""):
-    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendPhoto"
-    data = urllib.parse.urlencode({
-        "chat_id": CHAT_ID,
-        "photo": photo_url,
-        "caption": caption[:1024]
-    }).encode()
     try:
-        req = urllib.request.Request(url, data=data)
-        with urllib.request.urlopen(req, timeout=60) as resp:
+        # Download image bytes directly from Pollinations
+        req = urllib.request.Request(photo_url, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=45) as resp:
+            img_bytes = resp.read()
+
+        # Send image bytes to Telegram via multipart/form-data
+        boundary = "----WebKitFormBoundary7MA4YWxkTrZu0gW"
+        body = []
+        
+        body.append(f"--{boundary}\r\nContent-Disposition: form-data; name=\"chat_id\"\r\n\r\n{CHAT_ID}".encode("utf-8"))
+        if caption:
+            body.append(f"--{boundary}\r\nContent-Disposition: form-data; name=\"caption\"\r\n\r\n{caption[:1024]}".encode("utf-8"))
+            
+        body.append(f"--{boundary}\r\nContent-Disposition: form-data; name=\"photo\"; filename=\"image.jpg\"\r\nContent-Type: image/jpeg\r\n\r\n".encode("utf-8") + img_bytes)
+        body.append(f"--{boundary}--\r\n".encode("utf-8"))
+        
+        payload = b"\r\n".join(body)
+        
+        url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendPhoto"
+        tg_req = urllib.request.Request(url, data=payload, headers={"Content-Type": f"multipart/form-data; boundary={boundary}"})
+        
+        with urllib.request.urlopen(tg_req, timeout=30) as resp:
             resp.read()
-        print(f"Sent photo to Telegram: {photo_url}")
+        print("Sent photo bytes to Telegram successfully!")
         return True
     except Exception as e:
         print(f"ERROR sending photo to Telegram: {e}")
@@ -174,7 +188,6 @@ def log_to_sheets(command, model, sections, image_url):
 
 
 def generate_instagram_post():
-    # Tailored specifically for @muhammad_musa125001 (AI Creator & Automation)
     prompt = (
         "You are the official AI Content Creator for 'Muhammad Musa' (@muhammad_musa125001), "
         "a top AI Creator and Automation Specialist. Generate a viral, professional Instagram post "
