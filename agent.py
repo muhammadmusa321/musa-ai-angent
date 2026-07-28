@@ -174,14 +174,16 @@ def log_to_sheets(command, model, sections, image_url):
 
 
 def generate_instagram_post():
+    # Tailored specifically for @muhammad_musa125001 (AI Creator & Automation)
     prompt = (
-        "Generate content for an Instagram post from an AI-persona lifestyle "
-        "account. Respond in exactly this format:\n\n"
-        "HEADLINE: <a short catchy headline>\n\n"
-        "CAPTION: <an engaging Instagram caption, 2-4 sentences, with relevant emojis>\n\n"
-        "HASHTAGS: <5 to 10 relevant hashtags, space separated>\n\n"
-        "IMAGE_PROMPT: <a detailed prompt suitable for an AI image generator "
-        "to create the accompanying visual>"
+        "You are the official AI Content Creator for 'Muhammad Musa' (@muhammad_musa125001), "
+        "a top AI Creator and Automation Specialist. Generate a viral, professional Instagram post "
+        "about AI tools, content automation, AI agents, or futuristic tech updates.\n\n"
+        "Respond in EXACTLY this format:\n\n"
+        "HEADLINE: <a short, punchy 3-6 word viral tech headline>\n\n"
+        "CAPTION: <an engaging, high-value caption explaining the AI tool or concept with 3 key bullet points, relevant emojis, and a strong Call-To-Action asking followers to SAVE or SHARE this post>\n\n"
+        "HASHTAGS: #AICreator #AITools #Automation #AIAgents #NoCode #TechUpdates #ArtificialIntelligence #ContentAutomation #BuildInPublic #PakistanTech\n\n"
+        "IMAGE_PROMPT: <a detailed prompt for a 3D dark-mode minimalist tech infographic poster, featuring glowing neon blue and purple UI elements, sleek futuristic digital icons, 8k resolution, cinematic lighting, modern cyber graphic design>"
     )
 
     last_error = None
@@ -204,8 +206,8 @@ def generate_instagram_post():
 
             logged = log_to_sheets("Create today's Instagram post", model, sections, image_url)
 
-            log_note = "📝 Logged to memory." if logged else "⚠️ Post generated, but logging to Sheets failed (check Actions log)."
-            image_note = "" if photo_sent else "\n⚠️ Image could not be sent to Telegram (check Actions log)."
+            log_note = "📝 Logged to memory." if logged else "⚠️ Post generated, but logging to Sheets failed."
+            image_note = "" if photo_sent else "\n⚠️ Image could not be sent to Telegram."
 
             send_telegram_message(
                 f"✅ Today's Instagram post (via {model}):\n\n{generated_text}\n\n{log_note}{image_note}"
@@ -217,10 +219,7 @@ def generate_instagram_post():
             continue
 
     send_telegram_message(
-        "⚠️ All AI models are currently rate-limited or unavailable on the "
-        "free tier. This usually clears within a minute (per-minute limit) "
-        "or resets tomorrow (daily limit). Check the Actions log for the "
-        f"exact error. Last error: {last_error}"
+        f"⚠️ All AI models failed. Last error: {last_error}"
     )
 
 
