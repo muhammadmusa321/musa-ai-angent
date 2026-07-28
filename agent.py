@@ -28,8 +28,9 @@ def load_persona():
     except Exception as e:
         print(f"Warning: Could not load persona.json ({e}), using default fallback.")
         return {
-            "system_prompt": "Generate an engaging Instagram post about modern AI tools and automation.",
-            "image_style_prefix": "3D dark-mode minimalist tech graphic, glowing neon style: "
+            "system_prompt": "Generate an engaging Instagram post about modern AI tools.",
+            "topics": ["AI Tools & Automation"],
+            "image_style_prefix": "3D dark-mode tech graphic, glowing neon style: "
         }
 
 
@@ -51,8 +52,6 @@ def send_telegram_message(text):
 
 def send_telegram_photo(photo_url, caption=""):
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendPhoto"
-    
-    # Direct URL send
     data = urllib.parse.urlencode({
         "chat_id": CHAT_ID,
         "photo": photo_url,
@@ -67,7 +66,6 @@ def send_telegram_photo(photo_url, caption=""):
     except Exception as e:
         print(f"URL photo send failed: {e}")
 
-    # Bytes download fallback
     try:
         req = urllib.request.Request(photo_url, headers={"User-Agent": "Mozilla/5.0"})
         with urllib.request.urlopen(req, timeout=35) as resp:
@@ -217,13 +215,18 @@ def log_to_sheets(command, model, sections, image_url):
 def generate_instagram_post():
     persona = load_persona()
     
+    topics_list = persona.get("topics", ["AI Tools & Automation"])
+    chosen_topic = random.choice(topics_list)
+    print(f"Selected Topic for today: {chosen_topic}")
+
     prompt = (
         f"{persona.get('system_prompt', '')}\n\n"
+        f"TODAY'S SPECIFIC FOCUS TOPIC: {chosen_topic}\n\n"
         "Respond in EXACTLY this format:\n\n"
         "HEADLINE: <a short, punchy 3-6 word viral tech headline>\n\n"
-        "CAPTION: <an engaging caption explaining the AI concept with 3 key bullet points, emojis, and a strong Call-To-Action asking followers to SAVE or SHARE>\n\n"
+        "CAPTION: <an engaging caption explaining this specific topic with 3 key bullet points, emojis, and a strong Call-To-Action asking followers to SAVE or SHARE>\n\n"
         "HASHTAGS: #AICreator #AITools #Automation #AIAgents #NoCode #TechUpdates #BuildInPublic #PakistanTech\n\n"
-        "IMAGE_PROMPT: <a concise description of visual icons, UI diagrams, or futuristic 3D nodes for this post>"
+        "IMAGE_PROMPT: <a concise description of visual 3D icons or infographic elements matching this exact topic>"
     )
 
     last_error = None
