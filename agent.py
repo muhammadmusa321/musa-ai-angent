@@ -37,34 +37,46 @@ def send_telegram_message(text):
 
 
 def send_telegram_photo(photo_url, caption=""):
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendPhoto"
+    
+    # Method 1: Direct URL to Telegram API
+    data = urllib.parse.urlencode({
+        "chat_id": CHAT_ID,
+        "photo": photo_url,
+        "caption": caption[:1024]
+    }).encode()
     try:
-        # Download image bytes directly from Pollinations
+        req = urllib.request.Request(url, data=data)
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            resp.read()
+        print(f"Sent photo via URL successfully: {photo_url}")
+        return True
+    except Exception as e:
+        print(f"URL photo send failed: {e}")
+
+    # Method 2: Download image bytes and upload
+    try:
         req = urllib.request.Request(photo_url, headers={"User-Agent": "Mozilla/5.0"})
-        with urllib.request.urlopen(req, timeout=45) as resp:
+        with urllib.request.urlopen(req, timeout=35) as resp:
             img_bytes = resp.read()
 
-        # Send image bytes to Telegram via multipart/form-data
         boundary = "----WebKitFormBoundary7MA4YWxkTrZu0gW"
         body = []
-        
         body.append(f"--{boundary}\r\nContent-Disposition: form-data; name=\"chat_id\"\r\n\r\n{CHAT_ID}".encode("utf-8"))
         if caption:
             body.append(f"--{boundary}\r\nContent-Disposition: form-data; name=\"caption\"\r\n\r\n{caption[:1024]}".encode("utf-8"))
-            
         body.append(f"--{boundary}\r\nContent-Disposition: form-data; name=\"photo\"; filename=\"image.jpg\"\r\nContent-Type: image/jpeg\r\n\r\n".encode("utf-8") + img_bytes)
         body.append(f"--{boundary}--\r\n".encode("utf-8"))
         
         payload = b"\r\n".join(body)
-        
-        url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendPhoto"
         tg_req = urllib.request.Request(url, data=payload, headers={"Content-Type": f"multipart/form-data; boundary={boundary}"})
         
         with urllib.request.urlopen(tg_req, timeout=30) as resp:
             resp.read()
-        print("Sent photo bytes to Telegram successfully!")
+        print("Sent photo bytes successfully!")
         return True
     except Exception as e:
-        print(f"ERROR sending photo to Telegram: {e}")
+        print(f"Bytes photo send failed: {e}")
         return False
 
 
@@ -154,10 +166,11 @@ def parse_post_sections(generated_text):
 
 
 def build_image_url(image_prompt):
-    encoded_prompt = urllib.parse.quote(image_prompt)
+    short_prompt = image_prompt[:200]
+    encoded_prompt = urllib.parse.quote(short_prompt)
     return (
         f"https://image.pollinations.ai/prompt/{encoded_prompt}"
-        "?width=1024&height=1024&nologo=true"
+        "?width=1024&height=1024&nologo=true&model=flux"
     )
 
 
@@ -220,7 +233,7 @@ def generate_instagram_post():
             logged = log_to_sheets("Create today's Instagram post", model, sections, image_url)
 
             log_note = "📝 Logged to memory." if logged else "⚠️ Post generated, but logging to Sheets failed."
-            image_note = "" if photo_sent else "\n⚠️ Image could not be sent to Telegram."
+            image_note = "" if photo_sent else f"\n🖼️ Generated Image Link:\n{image_url}"
 
             send_telegram_message(
                 f"✅ Today's Instagram post (via {model}):\n\n{generated_text}\n\n{log_note}{image_note}"
