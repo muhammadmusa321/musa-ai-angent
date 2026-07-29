@@ -2,6 +2,8 @@ name: Read Telegram Message
 
 on:
   workflow_dispatch:
+  schedule:
+    - cron: '0 12 * * *'   # Runs daily automatically at 12:00 UTC (~5:00 PM Pakistan Time)
 
 jobs:
   read-message:
@@ -24,4 +26,5 @@ jobs:
           INSTAGRAM_APP_SECRET: ${{ secrets.INSTAGRAM_APP_SECRET }}
           INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
           INSTAGRAM_ACCOUNT_ID: ${{ secrets.INSTAGRAM_ACCOUNT_ID }}
+          TRIGGER_EVENT: ${{ github.event_name }}
         run: python3 agent.py
