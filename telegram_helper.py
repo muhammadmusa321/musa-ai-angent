@@ -51,10 +51,17 @@ def send_telegram_photo(photo_url, caption=""):
         return False
 
 def get_latest_message():
+    trigger_event = os.environ.get("TRIGGER_EVENT", "").strip()
+    
+    # If triggered automatically by daily Cron schedule, default to auto-post command
+    if trigger_event == "schedule":
+        print("Daily Scheduled Cron Triggered -> Running auto-post!")
+        return "Create today's Instagram post"
+
     try:
         with open("updates.json", "r") as f:
             updates = json.load(f)
         return updates["result"][-1]["message"]["text"]
     except Exception as e:
-        send_telegram_message(f"⚠️ Error reading Telegram message: {e}")
-        raise SystemExit(1)
+        print(f"Updates JSON empty or unreadable ({e}) -> Defaulting to auto-post command.")
+        return "Create today's Instagram post"
