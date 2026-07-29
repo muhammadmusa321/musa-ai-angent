@@ -4,10 +4,12 @@ import urllib.request
 
 SHEETS_WEBHOOK_URL = os.environ.get("SHEETS_WEBHOOK_URL", "")
 
+
 def log_to_sheets(command, model, sections, image_url):
     if not SHEETS_WEBHOOK_URL:
         return False
     payload = json.dumps({
+        "type": "post",
         "command": command,
         "model": model,
         "headline": sections.get("headline", ""),
@@ -24,4 +26,26 @@ def log_to_sheets(command, model, sections, image_url):
         return True
     except Exception as e:
         print(f"ERROR logging to Sheets: {e}")
+        return False
+
+
+def log_reply_to_sheets(media_id, comment_id, commenter_username, comment_text, reply_text):
+    if not SHEETS_WEBHOOK_URL:
+        return False
+    payload = json.dumps({
+        "type": "reply",
+        "media_id": media_id,
+        "comment_id": comment_id,
+        "commenter_username": commenter_username,
+        "comment_text": comment_text,
+        "reply_text": reply_text,
+    }).encode()
+
+    try:
+        req = urllib.request.Request(SHEETS_WEBHOOK_URL, data=payload, headers={"Content-Type": "application/json"})
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            resp.read()
+        return True
+    except Exception as e:
+        print(f"ERROR logging reply to Sheets: {e}")
         return False
