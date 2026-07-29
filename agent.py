@@ -2,6 +2,7 @@ import random
 from telegram_helper import send_telegram_message, send_telegram_photo, get_latest_message
 from ai_helper import load_persona, call_gemini_model, parse_post_sections, build_image_url, MODEL_FALLBACK_ORDER
 from sheets_helper import log_to_sheets
+from instagram_helper import publish_to_instagram
 
 def generate_instagram_post():
     persona = load_persona()
@@ -33,9 +34,13 @@ def generate_instagram_post():
 
             logged = log_to_sheets("Create today's Instagram post", model, sections, image_url)
             log_note = "📝 Logged to memory." if logged else "⚠️ Sheets logging failed."
-            image_note = "" if photo_sent else f"\n🖼️ Image Link: {image_url}"
 
-            send_telegram_message(f"✅ Today's Instagram post (via {model}):\n\n{generated_text}\n\n{log_note}{image_note}")
+            # Step 11: Auto Publish directly to Instagram
+            full_ig_caption = f"{sections.get('headline', '')}\n\n{sections.get('caption', '')}\n\n{sections.get('hashtags', '')}"
+            published, ig_result = publish_to_instagram(image_url, full_ig_caption)
+            ig_note = f"📸 Published to Instagram! (Post ID: {ig_result})" if published else f"⚠️ Instagram Publish Status: {ig_result}"
+
+            send_telegram_message(f"✅ Today's Instagram post (via {model}):\n\n{generated_text}\n\n{log_note}\n{ig_note}")
             return
         except RuntimeError as e:
             last_error = e
