@@ -7,22 +7,23 @@ import urllib.request
 import urllib.parse
 import urllib.error
 
-BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
-CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "").strip()
 INSTAGRAM_ACCOUNT_ID = os.environ.get("INSTAGRAM_ACCOUNT_ID", "").strip()
 INSTAGRAM_ACCESS_TOKEN = os.environ.get("INSTAGRAM_ACCESS_TOKEN", "").strip()
+BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
+CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "").strip()
 GRAPH_BASE = "https://graph.facebook.com/v19.0"
-
-
-async def generate_voiceover_async(text, output_file="voice.mp3"):
-    voice = "en-US-ChristopherNeural"
-    communicate = edge_tts.Communicate(text, voice)
-    await communicate.save(output_file)
 
 
 def create_voiceover(text, output_file="voice.mp3"):
     try:
-        asyncio.run(generate_voiceover_async(text, output_file))
+        import edge_tts
+
+        async def generate_voiceover_async():
+            voice = "en-US-ChristopherNeural"
+            communicate = edge_tts.Communicate(text, voice)
+            await communicate.save(output_file)
+
+        asyncio.run(generate_voiceover_async())
         return True, "Success"
     except Exception as e:
         print(f"Error generating AI voiceover: {e}")
