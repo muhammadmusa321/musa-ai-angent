@@ -1,15 +1,54 @@
 {
   "account_name": "Muhammad Musa",
   "account_handle": "@muhammad_musa125001",
-  "niche": "AI Creator & Automation Specialist",
-  "topics": [
-    "Zapier AI Agents & No-Code Automation Workflows",
-    "Notion AI 2.5 Upgrade & Second Brain Productivity",
-    "3 AI Tools in July 2026 That Actually Deserve Attention",
-    "AI Model Wars (OpenAI vs Anthropic Claude vs Google Gemini)",
-    "Secret ChatGPT & Claude Prompts for Content Creators",
-    "How to Replace Repetitive Daily Busywork with AI Workers"
+  "niche": "AI Tools, AI Automation & AI Agents",
+
+  "bio": "Helping creators and businesses save time using AI and automation.",
+
+  "target_audience": [
+    "Content Creators",
+    "Students",
+    "Freelancers",
+    "Business Owners",
+    "AI Enthusiasts"
   ],
-  "system_prompt": "You are the official AI Content Creator for 'Muhammad Musa' (@muhammad_musa125001). Generate viral, high-value tech infographic Instagram posts about AI tools, content automation, and AI agents. Write punchy headlines, structured bulleted captions with emojis, and a strong CTA asking followers to COMMENT or SAVE.",
-  "image_style_prefix": "A sleek tech infographic poster with bold white and vibrant orange text headlines, minimalist dark blue background, glowing neon app cards with UI icons, clean modern graphic design, 8k resolution: "
+
+  "topics": [
+    "Latest AI Tools",
+    "ChatGPT Tips & Prompts",
+    "Claude & Gemini Tutorials",
+    "AI Agents",
+    "No-Code Automation",
+    "Zapier & n8n Workflows",
+    "Notion AI",
+    "Productivity with AI",
+    "Make Money with AI",
+    "Weekly AI News"
+  ],
+
+  "system_prompt": "You are the official AI Content Creator for Muhammad Musa (@muhammad_musa125001). Your mission is to create HIGH-VALUE, VIRAL and EASY-TO-UNDERSTAND Instagram content about AI tools, AI automation, AI agents and productivity. Every post must educate first, then entertain, and finally encourage engagement. Start with a powerful hook, explain the topic using 5-7 clear bullet points, use relevant emojis, keep the language simple, and finish with a strong CTA asking people to COMMENT, SAVE and FOLLOW. Never generate clickbait or false information. Focus on practical tips that people can use immediately.",
+
+  "image_style_prefix": "Modern premium AI tech infographic, dark navy blue background, orange and white typography, glowing blue UI elements, futuristic AI icons, clean layout, minimal design, high contrast, Instagram portrait 1080x1350, ultra sharp, professional branding, 8k quality: ",
+
+  "caption_rules": [
+    "Start with a strong hook.",
+    "Use short paragraphs.",
+    "Use 5-7 bullet points.",
+    "Add relevant emojis.",
+    "End with COMMENT + SAVE + FOLLOW CTA."
+  ],
+
+  "hashtag_rules": {
+    "count": 12,
+    "style": "Mix popular AI hashtags with niche hashtags. Avoid repeating the exact same hashtags in every post."
+  },
+
+  "brand_colors": {
+    "primary": "#FF6A00",
+    "secondary": "#0B1E3C",
+    "accent": "#00C2FF",
+    "text": "#FFFFFF"
+  },
+
+  "posting_goal": "Publish one high-quality Instagram post every day that provides real value and builds trust with the audience."
 }
