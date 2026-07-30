@@ -13,7 +13,7 @@ GRAPH_BASE = "https://graph.facebook.com/v19.0"
 
 
 async def generate_voiceover_async(text, output_file="voice.mp3"):
-    voice = "en-US-ChristopherNeural"  # Professional AI Voice
+    voice = "en-US-ChristopherNeural"
     communicate = edge_tts.Communicate(text, voice)
     await communicate.save(output_file)
 
@@ -29,19 +29,25 @@ def create_voiceover(text, output_file="voice.mp3"):
 
 def build_reel_video(image_url, audio_file="voice.mp3", output_mp4="reel.mp4"):
     try:
-        # Download HD image
+        # Download HD background image
         req = urllib.request.Request(image_url, headers={"User-Agent": "Mozilla/5.0"})
         with urllib.request.urlopen(req, timeout=45) as resp:
             with open("bg.jpg", "wb") as f:
                 f.write(resp.read())
 
-        # Use FFmpeg to combine image + AI Voice into 1080x1920 MP4 Video Reel
-        cmd = (
-            f"ffmpeg -y -loop 1 -i bg.jpg -i {audio_file} -c:v libx264 -tune stillimage "
-            f"-c:a aac -b:a 192k -pix_fmt yuv420p -vf scale=1080:1920:force_original_aspect_ratio=decrease,"
-            f"pad=1080:1920:\\(ow-iw\\)/2:\\(oh-ih\\)/2 -shortest {output_mp4}"
-        )
-        subprocess.run(cmd, shell=True, check=True)
+        # Clean FFmpeg command to merge image + MP3 into 1080x1920 MP4 Reel
+        vf_filter = "scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2"
+        cmd = [
+            "ffmpeg", "-y",
+            "-loop", "1", "-i", "bg.jpg",
+            "-i", audio_file,
+            "-c:v", "libx264", "-tune", "stillimage",
+            "-c:a", "aac", "-b:a", "192k",
+            "-pix_fmt", "yuv420p",
+            "-vf", vf_filter,
+            "-shortest", output_mp4
+        ]
+        subprocess.run(cmd, check=True)
         print("MP4 Reel Video created successfully!")
         return True
     except Exception as e:
