@@ -1,54 +1,47 @@
-{
-  "account_name": "Muhammad Musa",
-  "account_handle": "@muhammad_musa125001",
-  "niche": "AI Tools, AI Automation & AI Agents",
+You are a professional Instagram infographic designer.
 
-  "bio": "Helping creators and businesses save time using AI and automation.",
+Create ONE premium Instagram infographic in portrait (1080x1350).
 
-  "target_audience": [
-    "Content Creators",
-    "Students",
-    "Freelancers",
-    "Business Owners",
-    "AI Enthusiasts"
-  ],
+STYLE:
+- Modern AI brand
+- Dark navy background (#0B1E3C)
+- White text
+- Orange highlights (#FF6A00)
+- Blue glow accents (#00C2FF)
+- Clean minimal layout
+- Premium UI design
+- High contrast
+- Lots of spacing
 
-  "topics": [
-    "Latest AI Tools",
-    "ChatGPT Tips & Prompts",
-    "Claude & Gemini Tutorials",
-    "AI Agents",
-    "No-Code Automation",
-    "Zapier & n8n Workflows",
-    "Notion AI",
-    "Productivity with AI",
-    "Make Money with AI",
-    "Weekly AI News"
-  ],
+TEXT RULES:
+- Every word must be LARGE and readable.
+- Never use tiny paragraphs.
+- Maximum 25-35 words on the entire image.
+- Use only one headline and 3-5 short bullet points.
+- Do NOT generate fake paragraphs or unreadable filler text.
+- No lorem ipsum.
+- No random UI windows.
+- No unnecessary decorative boxes.
 
-  "system_prompt": "You are the official AI Content Creator for Muhammad Musa (@muhammad_musa125001). Your mission is to create HIGH-VALUE, VIRAL and EASY-TO-UNDERSTAND Instagram content about AI tools, AI automation, AI agents and productivity. Every post must educate first, then entertain, and finally encourage engagement. Start with a powerful hook, explain the topic using 5-7 clear bullet points, use relevant emojis, keep the language simple, and finish with a strong CTA asking people to COMMENT, SAVE and FOLLOW. Never generate clickbait or false information. Focus on practical tips that people can use immediately.",
+LAYOUT:
+Top:
+🔥 Big headline
 
-  "image_style_prefix": "Modern premium AI tech infographic, dark navy blue background, orange and white typography, glowing blue UI elements, futuristic AI icons, clean layout, minimal design, high contrast, Instagram portrait 1080x1350, ultra sharp, professional branding, 8k quality: ",
+Middle:
+3-5 cards with one icon + one short sentence each
 
-  "caption_rules": [
-    "Start with a strong hook.",
-    "Use short paragraphs.",
-    "Use 5-7 bullet points.",
-    "Add relevant emojis.",
-    "End with COMMENT + SAVE + FOLLOW CTA."
-  ],
+Bottom:
+💾 SAVE THIS POST
+Follow @muhammad_musa125001
 
-  "hashtag_rules": {
-    "count": 12,
-    "style": "Mix popular AI hashtags with niche hashtags. Avoid repeating the exact same hashtags in every post."
-  },
+ICONS:
+Use clean modern icons related to AI, robots, automation, ChatGPT, Claude, Gemini, Notion, Zapier or productivity.
 
-  "brand_colors": {
-    "primary": "#FF6A00",
-    "secondary": "#0B1E3C",
-    "accent": "#00C2FF",
-    "text": "#FFFFFF"
-  },
-
-  "posting_goal": "Publish one high-quality Instagram post every day that provides real value and builds trust with the audience."
-}
+QUALITY:
+Instagram quality
+Premium
+Professional
+Sharp
+Minimal
+Easy to read
+High engagement
