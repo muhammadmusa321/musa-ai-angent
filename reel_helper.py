@@ -32,6 +32,7 @@ def create_voiceover(text, output_file="voice.mp3"):
 
 def build_reel_video(image_url, audio_file="voice.mp3", output_mp4="reel.mp4"):
     try:
+        # Download HD background image
         req = urllib.request.Request(image_url, headers={"User-Agent": "Mozilla/5.0"})
         with urllib.request.urlopen(req, timeout=45) as resp:
             with open("bg.jpg", "wb") as f:
@@ -43,21 +44,24 @@ def build_reel_video(image_url, audio_file="voice.mp3", output_mp4="reel.mp4"):
         return False, f"Audio file {audio_file} missing."
 
     try:
-        vf_filter = "scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2"
+        # Meta Official Reels Specs: 1080x1920, 30fps, AAC 44100Hz, H.264
+        vf_filter = "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920"
         cmd = [
             "ffmpeg", "-y",
             "-loop", "1", "-i", "bg.jpg",
             "-i", audio_file,
-            "-c:v", "libx264", "-tune", "stillimage",
-            "-c:a", "aac", "-b:a", "192k",
+            "-c:v", "libx264", "-preset", "fast",
+            "-c:a", "aac", "-b:a", "128k", "-ar", "44100",
             "-pix_fmt", "yuv420p",
+            "-r", "30",
             "-vf", vf_filter,
-            "-shortest", output_mp4
+            "-t", "8",
+            output_mp4
         ]
         res = subprocess.run(cmd, capture_output=True, text=True)
         if res.returncode != 0:
             return False, f"FFmpeg Error: {res.stderr[:150]}"
-        print("MP4 Reel Video created successfully!")
+        print("MP4 Reel Video created successfully for Meta Reels!")
         return True, "Success"
     except Exception as e:
         print(f"Error creating MP4 video: {e}")
@@ -65,7 +69,6 @@ def build_reel_video(image_url, audio_file="voice.mp3", output_mp4="reel.mp4"):
 
 
 def upload_to_catbox(file_path):
-    # Primary Host: TmpFiles API
     try:
         boundary = "----WebKitFormBoundaryTmpFilesUpload"
         with open(file_path, "rb") as f:
@@ -92,7 +95,6 @@ def upload_to_catbox(file_path):
     except Exception as e:
         print(f"Error uploading to TmpFiles: {e}")
 
-    # Fallback Host: Telegram CDN
     try:
         url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendDocument"
         boundary = "----WebKitFormBoundaryTelegramUpload"
@@ -152,7 +154,7 @@ def publish_reel_to_instagram(video_url, caption):
 
     # Step 2: Poll container status until FINISHED
     status_url = f"{GRAPH_BASE}/{container_id}?fields=status_code&access_token={INSTAGRAM_ACCESS_TOKEN}"
-    for _ in range(18):
+    for _ in range(12):
         time.sleep(5)
         try:
             s_req = urllib.request.Request(status_url)
