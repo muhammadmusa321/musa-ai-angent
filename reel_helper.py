@@ -13,6 +13,8 @@ BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
 CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "").strip()
 GRAPH_BASE = "https://graph.facebook.com/v19.0"
 
+LITTERBOX_API_URL = "https://litterbox.catbox.moe/resources/internals/api.php"
+
 
 def create_voiceover(text, output_file="voice.mp3"):
     try:
@@ -32,7 +34,6 @@ def create_voiceover(text, output_file="voice.mp3"):
 
 def build_reel_video(image_url, audio_file="voice.mp3", output_mp4="reel.mp4"):
     try:
-        # Download HD background image
         req = urllib.request.Request(image_url, headers={"User-Agent": "Mozilla/5.0"})
         with urllib.request.urlopen(req, timeout=45) as resp:
             with open("bg.jpg", "wb") as f:
@@ -44,7 +45,6 @@ def build_reel_video(image_url, audio_file="voice.mp3", output_mp4="reel.mp4"):
         return False, f"Audio file {audio_file} missing."
 
     try:
-        # Meta Official Reels Specs: 1080x1920, 30fps, AAC 44100Hz, H.264
         vf_filter = "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920"
         cmd = [
             "ffmpeg", "-y",
@@ -69,70 +69,65 @@ def build_reel_video(image_url, audio_file="voice.mp3", output_mp4="reel.mp4"):
 
 
 def upload_to_catbox(file_path):
+    """
+    Uploads the rendered MP4 to litterbox.catbox.moe, which returns a
+    direct raw binary file URL (no redirects, no landing page) --
+    required for Meta's facebookexternalhit crawler to fetch and
+    process the video successfully.
+
+    Files expire after 1 hour on litterbox -- more than enough time
+    for Meta to fetch and process the container, and we don't need
+    permanent hosting since the file's only job is to get published.
+    """
     try:
-        boundary = "----WebKitFormBoundaryTmpFilesUpload"
+        boundary = "----HermesAgentReelUpload"
         with open(file_path, "rb") as f:
             file_bytes = f.read()
 
-        body = []
-        body.append(f"--{boundary}\r\nContent-Disposition: form-data; name=\"file\"; filename=\"reel.mp4\"\r\nContent-Type: video/mp4\r\n\r\n".encode("utf-8") + file_bytes)
-        body.append(f"--{boundary}--\r\n".encode("utf-8"))
-        payload = b"\r\n".join(body)
+        def field(name, value):
+            return (
+                f"--{boundary}\r\n"
+                f"Content-Disposition: form-data; name=\"{name}\"\r\n\r\n"
+                f"{value}\r\n"
+            ).encode("utf-8")
+
+        body = b""
+        body += field("reqtype", "fileupload")
+        body += field("time", "1h")
+        body += (
+            f"--{boundary}\r\n"
+            f"Content-Disposition: form-data; name=\"fileToUpload\"; filename=\"reel.mp4\"\r\n"
+            f"Content-Type: video/mp4\r\n\r\n"
+        ).encode("utf-8") + file_bytes + b"\r\n"
+        body += f"--{boundary}--\r\n".encode("utf-8")
 
         req = urllib.request.Request(
-            "https://tmpfiles.org/api/v1/upload",
-            data=payload,
-            headers={"Content-Type": f"multipart/form-data; boundary={boundary}", "User-Agent": "Mozilla/5.0"}
+            LITTERBOX_API_URL,
+            data=body,
+            headers={
+                "Content-Type": f"multipart/form-data; boundary={boundary}",
+                "User-Agent": "Mozilla/5.0"
+            }
         )
-        with urllib.request.urlopen(req, timeout=45) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
-        
-        raw_url = data.get("data", {}).get("url", "")
-        if raw_url:
-            direct_url = raw_url.replace("tmpfiles.org/", "tmpfiles.org/dl/")
-            print(f"Uploaded Reel MP4 to TmpFiles: {direct_url}")
-            return direct_url
-    except Exception as e:
-        print(f"Error uploading to TmpFiles: {e}")
-
-    try:
-        url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendDocument"
-        boundary = "----WebKitFormBoundaryTelegramUpload"
-        
-        with open(file_path, "rb") as f:
-            file_bytes = f.read()
-
-        body = []
-        body.append(f"--{boundary}\r\nContent-Disposition: form-data; name=\"chat_id\"\r\n\r\n{CHAT_ID}".encode("utf-8"))
-        body.append(f"--{boundary}\r\nContent-Disposition: form-data; name=\"document\"; filename=\"reel.mp4\"\r\nContent-Type: video/mp4\r\n\r\n".encode("utf-8") + file_bytes)
-        body.append(f"--{boundary}--\r\n".encode("utf-8"))
-        payload = b"\r\n".join(body)
-
-        req = urllib.request.Request(url, data=payload, headers={"Content-Type": f"multipart/form-data; boundary={boundary}"})
         with urllib.request.urlopen(req, timeout=60) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
-        
-        file_id = data.get("result", {}).get("document", {}).get("file_id")
-        if file_id:
-            get_file_url = f"https://api.telegram.org/bot{BOT_TOKEN}/getFile?file_id={file_id}"
-            with urllib.request.urlopen(get_file_url, timeout=30) as f_resp:
-                f_data = json.loads(f_resp.read().decode("utf-8"))
-            
-            file_path_on_tg = f_data["result"]["file_path"]
-            public_url = f"https://api.telegram.org/file/bot{BOT_TOKEN}/{file_path_on_tg}"
-            print(f"Telegram CDN Public Video URL: {public_url}")
-            return public_url
-    except Exception as e:
-        print(f"Error uploading video to Telegram CDN: {e}")
+            direct_url = resp.read().decode("utf-8").strip()
 
-    return None
+        if direct_url.startswith("https://litterbox.catbox.moe/"):
+            print(f"Uploaded Reel MP4 to Litterbox: {direct_url}")
+            return direct_url
+        else:
+            print(f"Unexpected Litterbox response: {direct_url}")
+            return None
+
+    except Exception as e:
+        print(f"Error uploading to Litterbox: {e}")
+        return None
 
 
 def publish_reel_to_instagram(video_url, caption):
     if not INSTAGRAM_ACCOUNT_ID or not INSTAGRAM_ACCESS_TOKEN:
         return False, "Instagram Credentials Missing."
 
-    # Step 1: Create REELS Container
     create_url = f"{GRAPH_BASE}/{INSTAGRAM_ACCOUNT_ID}/media"
     payload = urllib.parse.urlencode({
         "media_type": "REELS",
@@ -152,7 +147,6 @@ def publish_reel_to_instagram(video_url, caption):
     except Exception as e:
         return False, f"Reel Container Exception: {str(e)}"
 
-    # Step 2: Poll container status until FINISHED
     status_url = f"{GRAPH_BASE}/{container_id}?fields=status_code&access_token={INSTAGRAM_ACCESS_TOKEN}"
     for _ in range(12):
         time.sleep(5)
@@ -169,7 +163,6 @@ def publish_reel_to_instagram(video_url, caption):
         except Exception:
             pass
 
-    # Step 3: Publish REELS Container
     publish_url = f"{GRAPH_BASE}/{INSTAGRAM_ACCOUNT_ID}/media_publish"
     pub_payload = urllib.parse.urlencode({
         "creation_id": container_id,
