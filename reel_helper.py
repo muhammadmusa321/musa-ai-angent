@@ -5,8 +5,10 @@ import subprocess
 import time
 import urllib.request
 import urllib.parse
-import edge_tts
+import urllib.error
 
+BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
+CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "").strip()
 INSTAGRAM_ACCOUNT_ID = os.environ.get("INSTAGRAM_ACCOUNT_ID", "").strip()
 INSTAGRAM_ACCESS_TOKEN = os.environ.get("INSTAGRAM_ACCESS_TOKEN", "").strip()
 GRAPH_BASE = "https://graph.facebook.com/v19.0"
@@ -42,12 +44,18 @@ def build_reel_video(image_url, audio_file="voice.mp3", output_mp4="reel.mp4"):
 
     try:
         # Clean FFmpeg command
-        cmd = (
-            f'ffmpeg -y -loop 1 -i bg.jpg -i {audio_file} -c:v libx264 -tune stillimage '
-            f'-c:a aac -b:a 192k -pix_fmt yuv420p -vf "scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2" '
-            f'-shortest {output_mp4}'
-        )
-        res = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+        vf_filter = "scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2"
+        cmd = [
+            "ffmpeg", "-y",
+            "-loop", "1", "-i", "bg.jpg",
+            "-i", audio_file,
+            "-c:v", "libx264", "-tune", "stillimage",
+            "-c:a", "aac", "-b:a", "192k",
+            "-pix_fmt", "yuv420p",
+            "-vf", vf_filter,
+            "-shortest", output_mp4
+        ]
+        res = subprocess.run(cmd, capture_output=True, text=True)
         if res.returncode != 0:
             return False, f"FFmpeg Error: {res.stderr[:150]}"
         print("MP4 Reel Video created successfully!")
@@ -58,28 +66,39 @@ def build_reel_video(image_url, audio_file="voice.mp3", output_mp4="reel.mp4"):
 
 
 def upload_to_catbox(file_path):
+    """
+    Uploads MP4 video directly to Telegram's native CDN to generate a 100% reliable public URL.
+    """
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendDocument"
+    boundary = "----WebKitFormBoundaryTelegramUpload"
+    
     try:
-        boundary = "----WebKitFormBoundaryCatboxUpload"
         with open(file_path, "rb") as f:
             file_bytes = f.read()
 
         body = []
-        body.append(f"--{boundary}\r\nContent-Disposition: form-data; name=\"reqtype\"\r\n\r\nfileupload".encode())
-        body.append(f"--{boundary}\r\nContent-Disposition: form-data; name=\"fileToUpload\"; filename=\"reel.mp4\"\r\nContent-Type: video/mp4\r\n\r\n".encode() + file_bytes)
-        body.append(f"--{boundary}--\r\n".encode())
-
+        body.append(f"--{boundary}\r\nContent-Disposition: form-data; name=\"chat_id\"\r\n\r\n{CHAT_ID}".encode("utf-8"))
+        body.append(f"--{boundary}\r\nContent-Disposition: form-data; name=\"document\"; filename=\"reel.mp4\"\r\nContent-Type: video/mp4\r\n\r\n".encode("utf-8") + file_bytes)
+        body.append(f"--{boundary}--\r\n".encode("utf-8"))
         payload = b"\r\n".join(body)
-        req = urllib.request.Request(
-            "https://catbox.moe/user/api.php",
-            data=payload,
-            headers={"Content-Type": f"multipart/form-data; boundary={boundary}", "User-Agent": "Mozilla/5.0"}
-        )
+
+        req = urllib.request.Request(url, data=payload, headers={"Content-Type": f"multipart/form-data; boundary={boundary}"})
         with urllib.request.urlopen(req, timeout=60) as resp:
-            video_url = resp.read().decode("utf-8").strip()
-        print(f"Uploaded Reel MP4 to Catbox: {video_url}")
-        return video_url
+            data = json.loads(resp.read().decode("utf-8"))
+        
+        file_id = data["result"]["document"]["file_id"]
+        
+        # Get public URL from Telegram CDN
+        get_file_url = f"https://api.telegram.org/bot{BOT_TOKEN}/getFile?file_id={file_id}"
+        with urllib.request.urlopen(get_file_url, timeout=30) as f_resp:
+            f_data = json.loads(f_resp.read().decode("utf-8"))
+        
+        file_path_on_tg = f_data["result"]["file_path"]
+        public_url = f"https://api.telegram.org/file/bot{BOT_TOKEN}/{file_path_on_tg}"
+        print(f"Telegram CDN Public Video URL: {public_url}")
+        return public_url
     except Exception as e:
-        print(f"Error uploading video to host: {e}")
+        print(f"Error uploading video to Telegram CDN: {e}")
         return None
 
 
@@ -87,6 +106,7 @@ def publish_reel_to_instagram(video_url, caption):
     if not INSTAGRAM_ACCOUNT_ID or not INSTAGRAM_ACCESS_TOKEN:
         return False, "Instagram Credentials Missing."
 
+    # Step 1: Create REELS Container
     create_url = f"{GRAPH_BASE}/{INSTAGRAM_ACCOUNT_ID}/media"
     payload = urllib.parse.urlencode({
         "media_type": "REELS",
@@ -106,6 +126,7 @@ def publish_reel_to_instagram(video_url, caption):
     except Exception as e:
         return False, f"Reel Container Exception: {str(e)}"
 
+    # Step 2: Poll container status until FINISHED
     status_url = f"{GRAPH_BASE}/{container_id}?fields=status_code&access_token={INSTAGRAM_ACCESS_TOKEN}"
     for _ in range(18):
         time.sleep(5)
@@ -122,6 +143,7 @@ def publish_reel_to_instagram(video_url, caption):
         except Exception:
             pass
 
+    # Step 3: Publish REELS Container
     publish_url = f"{GRAPH_BASE}/{INSTAGRAM_ACCOUNT_ID}/media_publish"
     pub_payload = urllib.parse.urlencode({
         "creation_id": container_id,
