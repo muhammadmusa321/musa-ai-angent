@@ -11,7 +11,7 @@ from instagram_helper import (
     has_our_reply,
     reply_to_comment,
 )
-from reel_helper import create_voiceover, build_reel_video, upload_to_catbox, publish_reel_to_instagram
+from reel_helper import create_voiceover, build_reel_video, upload_video_to_telegram_cdn, publish_reel_to_instagram
 
 OUR_USERNAME = "muhammad_musa125001"
 
@@ -21,7 +21,6 @@ def generate_instagram_reel():
     topics_list = persona.get("topics", ["AI Tools & Automation"])
     chosen_topic = random.choice(topics_list)
 
-    # 1. Script & Voiceover Text
     script_prompt = (
         f"Write a 15-second viral Instagram Reel script voiceover for '{chosen_topic}'. "
         "Keep it punchy, high-energy, educational, and under 35 words total. "
@@ -43,13 +42,11 @@ def generate_instagram_reel():
         send_telegram_message("⚠️ All AI models rate-limited while generating Reel script. Please try again in 1 minute.")
         return
 
-    # 2. Create AI Voice MP3
     voice_created, v_err = create_voiceover(voiceover_text, "voice.mp3")
     if not voice_created:
         send_telegram_message(f"⚠️ AI Voiceover Error: {v_err}")
         return
 
-    # 3. Create Visual Image & MP4 Reel
     style_prefix = persona.get("image_style_prefix", "")
     image_url = build_image_url(f"Vertical 1080x1920 poster for {chosen_topic}", style_prefix)
     
@@ -58,10 +55,9 @@ def generate_instagram_reel():
         send_telegram_message(f"⚠️ Video Build Details: {r_err}")
         return
 
-    # 4. Upload MP4 & Publish Reel
-    public_video_url = upload_to_catbox("reel.mp4")
+    public_video_url = upload_video_to_telegram_cdn("reel.mp4")
     if not public_video_url:
-        send_telegram_message("⚠️ Failed to upload Reel MP4 to public video host.")
+        send_telegram_message("⚠️ Failed to upload Reel MP4 to Telegram CDN.")
         return
 
     caption = f"🎬 {chosen_topic}\n\n{voiceover_text}\n\n#AICreator #AITools #Reels #Automation #PakistanTech"
