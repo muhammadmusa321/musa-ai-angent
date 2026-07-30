@@ -32,7 +32,6 @@ def create_voiceover(text, output_file="voice.mp3"):
 
 def build_reel_video(image_url, audio_file="voice.mp3", output_mp4="reel.mp4"):
     try:
-        # Download HD background image
         req = urllib.request.Request(image_url, headers={"User-Agent": "Mozilla/5.0"})
         with urllib.request.urlopen(req, timeout=45) as resp:
             with open("bg.jpg", "wb") as f:
@@ -44,7 +43,6 @@ def build_reel_video(image_url, audio_file="voice.mp3", output_mp4="reel.mp4"):
         return False, f"Audio file {audio_file} missing."
 
     try:
-        # Clean FFmpeg command
         vf_filter = "scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2"
         cmd = [
             "ffmpeg", "-y",
@@ -67,13 +65,38 @@ def build_reel_video(image_url, audio_file="voice.mp3", output_mp4="reel.mp4"):
 
 
 def upload_to_catbox(file_path):
-    """
-    Uploads MP4 video directly to Telegram's native CDN to generate a 100% reliable public URL.
-    """
-    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendDocument"
-    boundary = "----WebKitFormBoundaryTelegramUpload"
-    
+    # Primary Host: TmpFiles API
     try:
+        boundary = "----WebKitFormBoundaryTmpFilesUpload"
+        with open(file_path, "rb") as f:
+            file_bytes = f.read()
+
+        body = []
+        body.append(f"--{boundary}\r\nContent-Disposition: form-data; name=\"file\"; filename=\"reel.mp4\"\r\nContent-Type: video/mp4\r\n\r\n".encode("utf-8") + file_bytes)
+        body.append(f"--{boundary}--\r\n".encode("utf-8"))
+        payload = b"\r\n".join(body)
+
+        req = urllib.request.Request(
+            "https://tmpfiles.org/api/v1/upload",
+            data=payload,
+            headers={"Content-Type": f"multipart/form-data; boundary={boundary}", "User-Agent": "Mozilla/5.0"}
+        )
+        with urllib.request.urlopen(req, timeout=45) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+        
+        raw_url = data.get("data", {}).get("url", "")
+        if raw_url:
+            direct_url = raw_url.replace("tmpfiles.org/", "tmpfiles.org/dl/")
+            print(f"Uploaded Reel MP4 to TmpFiles: {direct_url}")
+            return direct_url
+    except Exception as e:
+        print(f"Error uploading to TmpFiles: {e}")
+
+    # Fallback Host: Telegram CDN
+    try:
+        url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendDocument"
+        boundary = "----WebKitFormBoundaryTelegramUpload"
+        
         with open(file_path, "rb") as f:
             file_bytes = f.read()
 
@@ -87,20 +110,20 @@ def upload_to_catbox(file_path):
         with urllib.request.urlopen(req, timeout=60) as resp:
             data = json.loads(resp.read().decode("utf-8"))
         
-        file_id = data["result"]["document"]["file_id"]
-        
-        # Get public URL from Telegram CDN
-        get_file_url = f"https://api.telegram.org/bot{BOT_TOKEN}/getFile?file_id={file_id}"
-        with urllib.request.urlopen(get_file_url, timeout=30) as f_resp:
-            f_data = json.loads(f_resp.read().decode("utf-8"))
-        
-        file_path_on_tg = f_data["result"]["file_path"]
-        public_url = f"https://api.telegram.org/file/bot{BOT_TOKEN}/{file_path_on_tg}"
-        print(f"Telegram CDN Public Video URL: {public_url}")
-        return public_url
+        file_id = data.get("result", {}).get("document", {}).get("file_id")
+        if file_id:
+            get_file_url = f"https://api.telegram.org/bot{BOT_TOKEN}/getFile?file_id={file_id}"
+            with urllib.request.urlopen(get_file_url, timeout=30) as f_resp:
+                f_data = json.loads(f_resp.read().decode("utf-8"))
+            
+            file_path_on_tg = f_data["result"]["file_path"]
+            public_url = f"https://api.telegram.org/file/bot{BOT_TOKEN}/{file_path_on_tg}"
+            print(f"Telegram CDN Public Video URL: {public_url}")
+            return public_url
     except Exception as e:
         print(f"Error uploading video to Telegram CDN: {e}")
-        return None
+
+    return None
 
 
 def publish_reel_to_instagram(video_url, caption):
