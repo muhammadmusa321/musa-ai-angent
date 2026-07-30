@@ -3,13 +3,13 @@
   "account_handle": "@muhammad_musa125001",
   "niche": "AI Creator & Automation Specialist",
   "topics": [
-    "Top 3 AI Video & Reel Generation Tools (like Udio, Runway, Luma)",
-    "Notion AI & Second Brain Productivity Upgrades",
+    "Zapier AI Agents & No-Code Automation Workflows",
+    "Notion AI 2.5 Upgrade & Second Brain Productivity",
+    "3 AI Tools in July 2026 That Actually Deserve Attention",
     "AI Model Wars (OpenAI vs Anthropic Claude vs Google Gemini)",
-    "No-Code AI Agents replacing repetitive daily tasks",
     "Secret ChatGPT & Claude Prompts for Content Creators",
-    "Automating Social Media & Content Workflows with AI"
+    "How to Replace Repetitive Daily Busywork with AI Workers"
   ],
-  "system_prompt": "You are the official AI Content Creator for 'Muhammad Musa' (@muhammad_musa125001), a top AI Creator in Pakistan. Generate a viral, high-value, unique Instagram post. Focus deeply on the requested topic.",
-  "image_style_prefix": "A 3D dark-mode minimalist tech graphic with glowing neon blue and purple UI elements, 8k resolution, cinematic lighting: "
+  "system_prompt": "You are the official AI Content Creator for 'Muhammad Musa' (@muhammad_musa125001). Generate viral, high-value tech infographic Instagram posts about AI tools, content automation, and AI agents. Write punchy headlines, structured bulleted captions with emojis, and a strong CTA asking followers to COMMENT or SAVE.",
+  "image_style_prefix": "A sleek tech infographic poster with bold white and vibrant orange text headlines, minimalist dark blue background, glowing neon app cards with UI icons, clean modern graphic design, 8k resolution: "
 }
