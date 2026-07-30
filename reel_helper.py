@@ -13,8 +13,6 @@ BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
 CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "").strip()
 GRAPH_BASE = "https://graph.facebook.com/v19.0"
 
-LITTERBOX_API_URL = "https://litterbox.catbox.moe/resources/internals/api.php"
-
 
 def create_voiceover(text, output_file="voice.mp3"):
     try:
@@ -68,59 +66,106 @@ def build_reel_video(image_url, audio_file="voice.mp3", output_mp4="reel.mp4"):
         return False, f"FFmpeg Exception: {str(e)[:100]}"
 
 
-def upload_to_catbox(file_path):
+def _build_multipart_body(fields, file_field_name, filename, file_bytes, file_content_type):
     """
-    Uploads the rendered MP4 to litterbox.catbox.moe, which returns a
-    direct raw binary file URL (no redirects, no landing page) --
-    required for Meta's facebookexternalhit crawler to fetch and
-    process the video successfully.
+    Builds a multipart/form-data body as pure bytes throughout -- avoids the
+    str/bytes mixing that caused the previous upload function to fail.
+    """
+    boundary = "----HermesAgentBoundary7f3a9c"
+    parts = []
 
-    Files expire after 1 hour on litterbox -- more than enough time
-    for Meta to fetch and process the container, and we don't need
-    permanent hosting since the file's only job is to get published.
+    for name, value in fields.items():
+        parts.append(
+            (f"--{boundary}\r\n"
+             f"Content-Disposition: form-data; name=\"{name}\"\r\n\r\n"
+             f"{value}\r\n").encode("utf-8")
+        )
+
+    parts.append(
+        (f"--{boundary}\r\n"
+         f"Content-Disposition: form-data; name=\"{file_field_name}\"; filename=\"{filename}\"\r\n"
+         f"Content-Type: {file_content_type}\r\n\r\n").encode("utf-8")
+    )
+    parts.append(file_bytes)
+    parts.append(b"\r\n")
+    parts.append(f"--{boundary}--\r\n".encode("utf-8"))
+
+    body = b"".join(parts)
+    return body, boundary
+
+
+def upload_video_to_telegram_cdn(file_path):
     """
+    Uploads the rendered MP4 to Telegram via sendDocument (not sendVideo --
+    sendVideo can re-encode/compress, which we don't want to feed to Meta),
+    then calls getFile to resolve a direct downloadable URL on Telegram's CDN.
+
+    Returns the direct file URL on success, or None on failure.
+    Note: Telegram only allows getFile downloads for files up to 20MB.
+    """
+    if not BOT_TOKEN or not CHAT_ID:
+        print("Telegram credentials missing.")
+        return None
+
     try:
-        boundary = "----HermesAgentReelUpload"
         with open(file_path, "rb") as f:
             file_bytes = f.read()
+    except Exception as e:
+        print(f"Error reading video file: {e}")
+        return None
 
-        def field(name, value):
-            return (
-                f"--{boundary}\r\n"
-                f"Content-Disposition: form-data; name=\"{name}\"\r\n\r\n"
-                f"{value}\r\n"
-            ).encode("utf-8")
+    file_size_mb = len(file_bytes) / (1024 * 1024)
+    print(f"Uploading {file_size_mb:.2f} MB to Telegram CDN...")
 
-        body = b""
-        body += field("reqtype", "fileupload")
-        body += field("time", "1h")
-        body += (
-            f"--{boundary}\r\n"
-            f"Content-Disposition: form-data; name=\"fileToUpload\"; filename=\"reel.mp4\"\r\n"
-            f"Content-Type: video/mp4\r\n\r\n"
-        ).encode("utf-8") + file_bytes + b"\r\n"
-        body += f"--{boundary}--\r\n".encode("utf-8")
+    # Step 1: Upload via sendDocument
+    send_url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendDocument"
+    body, boundary = _build_multipart_body(
+        fields={"chat_id": CHAT_ID},
+        file_field_name="document",
+        filename="reel.mp4",
+        file_bytes=file_bytes,
+        file_content_type="video/mp4"
+    )
 
+    try:
         req = urllib.request.Request(
-            LITTERBOX_API_URL,
+            send_url,
             data=body,
-            headers={
-                "Content-Type": f"multipart/form-data; boundary={boundary}",
-                "User-Agent": "Mozilla/5.0"
-            }
+            headers={"Content-Type": f"multipart/form-data; boundary={boundary}"}
         )
-        with urllib.request.urlopen(req, timeout=60) as resp:
-            direct_url = resp.read().decode("utf-8").strip()
+        with urllib.request.urlopen(req, timeout=90) as resp:
+            result = json.loads(resp.read().decode("utf-8"))
 
-        if direct_url.startswith("https://litterbox.catbox.moe/"):
-            print(f"Uploaded Reel MP4 to Litterbox: {direct_url}")
-            return direct_url
-        else:
-            print(f"Unexpected Litterbox response: {direct_url}")
+        if not result.get("ok"):
+            print(f"sendDocument failed: {result}")
             return None
 
+        file_id = result["result"]["document"]["file_id"]
+        print(f"Uploaded to Telegram, file_id: {file_id}")
+
     except Exception as e:
-        print(f"Error uploading to Litterbox: {e}")
+        print(f"Error in sendDocument: {e}")
+        return None
+
+    # Step 2: Resolve file_id -> file_path via getFile
+    get_file_url = f"https://api.telegram.org/bot{BOT_TOKEN}/getFile?file_id={file_id}"
+    try:
+        req = urllib.request.Request(get_file_url)
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            result = json.loads(resp.read().decode("utf-8"))
+
+        if not result.get("ok"):
+            print(f"getFile failed: {result}")
+            return None
+
+        telegram_file_path = result["result"]["file_path"]
+        direct_url = f"https://api.telegram.org/file/bot{BOT_TOKEN}/{telegram_file_path}"
+        print(f"Resolved direct CDN URL (token redacted in log): "
+              f".../file/bot***/{telegram_file_path}")
+        return direct_url
+
+    except Exception as e:
+        print(f"Error in getFile: {e}")
         return None
 
 
