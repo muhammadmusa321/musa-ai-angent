@@ -21,17 +21,26 @@ def generate_instagram_reel():
     topics_list = persona.get("topics", ["AI Tools & Automation"])
     chosen_topic = random.choice(topics_list)
 
-    # 1. Script & Voiceover Text
+    # 1. Script & Voiceover Text with Multi-Model Fallback
     script_prompt = (
         f"Write a 15-second viral Instagram Reel script voiceover for '{chosen_topic}'. "
         "Keep it punchy, high-energy, educational, and under 35 words total. "
         "Do not include brackets, scene descriptions, or labels. Return ONLY the spoken voiceover text."
     )
 
-    try:
-        voiceover_text = call_gemini_model("gemini-2.0-flash", script_prompt)
-    except Exception as e:
-        send_telegram_message(f"⚠️ Failed to generate reel script: {e}")
+    voiceover_text = None
+    for model in MODEL_FALLBACK_ORDER:
+        try:
+            print(f"Generating Reel script with model: {model}")
+            voiceover_text = call_gemini_model(model, script_prompt)
+            if voiceover_text:
+                break
+        except Exception as e:
+            print(f"Model {model} failed for script: {e}")
+            continue
+
+    if not voiceover_text:
+        send_telegram_message("⚠️ All AI models rate-limited while generating Reel script. Please try again in 1 minute.")
         return
 
     # 2. Create AI Voice MP3
