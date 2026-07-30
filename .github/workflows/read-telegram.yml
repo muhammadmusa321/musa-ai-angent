@@ -3,7 +3,7 @@ name: Read Telegram Message
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 */4 * * *'   # Runs automatically every 4 hours (6 times a day!)
+    - cron: '0 */4 * * *'   # Runs automatically every 4 hours
 
 jobs:
   read-message:
@@ -11,6 +11,14 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install edge-tts
 
       - name: Get latest message from Telegram
         run: |
