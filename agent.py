@@ -1,4 +1,6 @@
+import os
 import random
+import time
 from telegram_helper import send_telegram_message, send_telegram_photo, get_latest_message
 from ai_helper import load_persona, call_gemini_model, parse_post_sections, build_image_url, generate_comment_reply, MODEL_FALLBACK_ORDER
 from sheets_helper import log_to_sheets, log_reply_to_sheets
@@ -79,7 +81,7 @@ def reply_to_comments():
             commenter_username = comment.get("username", "unknown")
 
             if commenter_username.lower() == OUR_USERNAME.lower():
-                continue  # never reply to our own comments
+                continue  # Skip own comments
 
             if has_our_reply(comment, OUR_USERNAME):
                 total_skipped += 1
@@ -109,6 +111,16 @@ def reply_to_comments():
 
 
 def main():
+    trigger_event = os.environ.get("TRIGGER_EVENT", "").strip()
+
+    # Autopilot Cron Schedule: Automatically post + reply every 4 hours!
+    if trigger_event == "schedule":
+        send_telegram_message("⏰ 4-Hour Autopilot Triggered! Generating Post & Replying to Comments...")
+        generate_instagram_post()
+        time.sleep(5)
+        reply_to_comments()
+        return
+
     message = get_latest_message()
     stripped_message = message.strip()
 
@@ -117,6 +129,11 @@ def main():
         generate_instagram_post()
     elif stripped_message == "Reply to comments":
         send_telegram_message("💬 Command Recognized! Checking recent posts for new comments...")
+        reply_to_comments()
+    elif stripped_message == "Run full pipeline":
+        send_telegram_message("🚀 Running Full Pipeline: Post + Comment Replies...")
+        generate_instagram_post()
+        time.sleep(5)
         reply_to_comments()
     else:
         send_telegram_message(f"❓ Unrecognized Command: {message}")
