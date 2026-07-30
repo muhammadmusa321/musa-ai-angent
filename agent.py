@@ -11,8 +11,57 @@ from instagram_helper import (
     has_our_reply,
     reply_to_comment,
 )
+from reel_helper import create_voiceover, build_reel_video, upload_to_catbox, publish_reel_to_instagram
 
 OUR_USERNAME = "muhammad_musa125001"
+
+
+def generate_instagram_reel():
+    persona = load_persona()
+    topics_list = persona.get("topics", ["AI Tools & Automation"])
+    chosen_topic = random.choice(topics_list)
+
+    # 1. Script & Voiceover Text
+    script_prompt = (
+        f"Write a 15-second viral Instagram Reel script voiceover for '{chosen_topic}'. "
+        "Keep it punchy, high-energy, educational, and under 35 words total. "
+        "Do not include brackets, scene descriptions, or labels. Return ONLY the spoken voiceover text."
+    )
+
+    try:
+        voiceover_text = call_gemini_model("gemini-2.0-flash", script_prompt)
+    except Exception as e:
+        send_telegram_message(f"⚠️ Failed to generate reel script: {e}")
+        return
+
+    # 2. Create AI Voice MP3
+    voice_created = create_voiceover(voiceover_text, "voice.mp3")
+    if not voice_created:
+        send_telegram_message("⚠️ Failed to generate AI voiceover.")
+        return
+
+    # 3. Create Visual Image & MP4 Reel
+    style_prefix = persona.get("image_style_prefix", "")
+    image_url = build_image_url(f"Vertical 1080x1920 poster for {chosen_topic}", style_prefix)
+    
+    reel_created = build_reel_video(image_url, "voice.mp3", "reel.mp4")
+    if not reel_created:
+        send_telegram_message("⚠️ Failed to build MP4 Reel video.")
+        return
+
+    # 4. Upload MP4 & Publish Reel
+    public_video_url = upload_to_catbox("reel.mp4")
+    if not public_video_url:
+        send_telegram_message("⚠️ Failed to upload Reel MP4 to public video host.")
+        return
+
+    caption = f"🎬 {chosen_topic}\n\n{voiceover_text}\n\n#AICreator #AITools #Reels #Automation #PakistanTech"
+    published, reel_result = publish_reel_to_instagram(public_video_url, caption)
+
+    if published:
+        send_telegram_message(f"🎥 **AI REEL PUBLISHED TO INSTAGRAM!**\n\n**Topic:** {chosen_topic}\n**Script:** \"{voiceover_text}\"\n**Reel ID:** {reel_result}")
+    else:
+        send_telegram_message(f"⚠️ Reel Publishing Status: {reel_result}")
 
 
 def generate_instagram_post():
@@ -81,7 +130,7 @@ def reply_to_comments():
             commenter_username = comment.get("username", "unknown")
 
             if commenter_username.lower() == OUR_USERNAME.lower():
-                continue  # Skip own comments
+                continue
 
             if has_our_reply(comment, OUR_USERNAME):
                 total_skipped += 1
@@ -113,10 +162,11 @@ def reply_to_comments():
 def main():
     trigger_event = os.environ.get("TRIGGER_EVENT", "").strip()
 
-    # Autopilot Cron Schedule: Automatically post + reply every 4 hours!
     if trigger_event == "schedule":
-        send_telegram_message("⏰ 4-Hour Autopilot Triggered! Generating Post & Replying to Comments...")
+        send_telegram_message("⏰ 4-Hour Autopilot Triggered! Running Post + Reel + Comment Replies...")
         generate_instagram_post()
+        time.sleep(5)
+        generate_instagram_reel()
         time.sleep(5)
         reply_to_comments()
         return
@@ -127,12 +177,17 @@ def main():
     if stripped_message == "Create today's Instagram post":
         send_telegram_message("🤖 Command Recognized! Generating Instagram Post with AI Brain...")
         generate_instagram_post()
+    elif stripped_message == "Create AI Reel":
+        send_telegram_message("🎥 Command Recognized! Generating AI Voiceover Reel Video...")
+        generate_instagram_reel()
     elif stripped_message == "Reply to comments":
         send_telegram_message("💬 Command Recognized! Checking recent posts for new comments...")
         reply_to_comments()
     elif stripped_message == "Run full pipeline":
-        send_telegram_message("🚀 Running Full Pipeline: Post + Comment Replies...")
+        send_telegram_message("🚀 Running Full Pipeline: Post + Reel + Comment Replies...")
         generate_instagram_post()
+        time.sleep(5)
+        generate_instagram_reel()
         time.sleep(5)
         reply_to_comments()
     else:
