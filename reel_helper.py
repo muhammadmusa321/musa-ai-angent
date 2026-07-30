@@ -67,10 +67,6 @@ def build_reel_video(image_url, audio_file="voice.mp3", output_mp4="reel.mp4"):
 
 
 def _build_multipart_body(fields, file_field_name, filename, file_bytes, file_content_type):
-    """
-    Builds a multipart/form-data body as pure bytes throughout -- avoids the
-    str/bytes mixing that caused the previous upload function to fail.
-    """
     boundary = "----HermesAgentBoundary7f3a9c"
     parts = []
 
@@ -95,14 +91,6 @@ def _build_multipart_body(fields, file_field_name, filename, file_bytes, file_co
 
 
 def upload_video_to_telegram_cdn(file_path):
-    """
-    Uploads the rendered MP4 to Telegram via sendDocument (not sendVideo --
-    sendVideo can re-encode/compress, which we don't want to feed to Meta),
-    then calls getFile to resolve a direct downloadable URL on Telegram's CDN.
-
-    Returns the direct file URL on success, or None on failure.
-    Note: Telegram only allows getFile downloads for files up to 20MB.
-    """
     if not BOT_TOKEN or not CHAT_ID:
         print("Telegram credentials missing.")
         return None
@@ -113,9 +101,6 @@ def upload_video_to_telegram_cdn(file_path):
     except Exception as e:
         print(f"Error reading video file: {e}")
         return None
-
-    file_size_mb = len(file_bytes) / (1024 * 1024)
-    print(f"Uploading {file_size_mb:.2f} MB to Telegram CDN...")
 
     # Step 1: Upload via sendDocument
     send_url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendDocument"
@@ -140,32 +125,39 @@ def upload_video_to_telegram_cdn(file_path):
             print(f"sendDocument failed: {result}")
             return None
 
-        file_id = result["result"]["document"]["file_id"]
-        print(f"Uploaded to Telegram, file_id: {file_id}")
+        res_dict = result.get("result", {})
+        file_id = None
+        if "document" in res_dict:
+            file_id = res_dict["document"].get("file_id")
+        elif "video" in res_dict:
+            file_id = res_dict["video"].get("file_id")
 
-    except Exception as e:
-        print(f"Error in sendDocument: {e}")
-        return None
-
-    # Step 2: Resolve file_id -> file_path via getFile
-    get_file_url = f"https://api.telegram.org/bot{BOT_TOKEN}/getFile?file_id={file_id}"
-    try:
-        req = urllib.request.Request(get_file_url)
-        with urllib.request.urlopen(req, timeout=30) as resp:
-            result = json.loads(resp.read().decode("utf-8"))
-
-        if not result.get("ok"):
-            print(f"getFile failed: {result}")
+        if not file_id:
+            print(f"No file_id in result: {result}")
             return None
 
-        telegram_file_path = result["result"]["file_path"]
+        print(f"Uploaded to Telegram, file_id: {file_id}")
+
+        # Step 2: Resolve file_id -> file_path via getFile
+        get_file_url = f"https://api.telegram.org/bot{BOT_TOKEN}/getFile?file_id={file_id}"
+        req_get = urllib.request.Request(get_file_url)
+        with urllib.request.urlopen(req_get, timeout=30) as resp_get:
+            get_res = json.loads(resp_get.read().decode("utf-8"))
+
+        if not get_res.get("ok"):
+            print(f"getFile failed: {get_res}")
+            return None
+
+        telegram_file_path = get_res["result"].get("file_path")
+        if not telegram_file_path:
+            return None
+
         direct_url = f"https://api.telegram.org/file/bot{BOT_TOKEN}/{telegram_file_path}"
-        print(f"Resolved direct CDN URL (token redacted in log): "
-              f".../file/bot***/{telegram_file_path}")
+        print(f"Resolved direct CDN URL: {direct_url}")
         return direct_url
 
     except Exception as e:
-        print(f"Error in getFile: {e}")
+        print(f"Error in upload_video_to_telegram_cdn: {e}")
         return None
 
 
@@ -193,7 +185,7 @@ def publish_reel_to_instagram(video_url, caption):
         return False, f"Reel Container Exception: {str(e)}"
 
     status_url = f"{GRAPH_BASE}/{container_id}?fields=status_code&access_token={INSTAGRAM_ACCESS_TOKEN}"
-    for _ in range(12):
+    for _ in range(18):
         time.sleep(5)
         try:
             s_req = urllib.request.Request(status_url)
