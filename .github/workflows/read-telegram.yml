@@ -3,7 +3,7 @@ name: Read Telegram Message
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 12 * * *'   # Rozana 5:00 PM PKT par automatic chalega
+    - cron: '0 */4 * * *'   # Runs automatically every 4 hours (6 times a day!)
 
 jobs:
   read-message:
