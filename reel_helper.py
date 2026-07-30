@@ -21,10 +21,10 @@ async def generate_voiceover_async(text, output_file="voice.mp3"):
 def create_voiceover(text, output_file="voice.mp3"):
     try:
         asyncio.run(generate_voiceover_async(text, output_file))
-        return True
+        return True, "Success"
     except Exception as e:
         print(f"Error generating AI voiceover: {e}")
-        return False
+        return False, str(e)
 
 
 def build_reel_video(image_url, audio_file="voice.mp3", output_mp4="reel.mp4"):
@@ -34,25 +34,27 @@ def build_reel_video(image_url, audio_file="voice.mp3", output_mp4="reel.mp4"):
         with urllib.request.urlopen(req, timeout=45) as resp:
             with open("bg.jpg", "wb") as f:
                 f.write(resp.read())
+    except Exception as e:
+        return False, f"Image Download Failed: {str(e)[:100]}"
 
-        # Clean FFmpeg command to merge image + MP3 into 1080x1920 MP4 Reel
-        vf_filter = "scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2"
-        cmd = [
-            "ffmpeg", "-y",
-            "-loop", "1", "-i", "bg.jpg",
-            "-i", audio_file,
-            "-c:v", "libx264", "-tune", "stillimage",
-            "-c:a", "aac", "-b:a", "192k",
-            "-pix_fmt", "yuv420p",
-            "-vf", vf_filter,
-            "-shortest", output_mp4
-        ]
-        subprocess.run(cmd, check=True)
+    if not os.path.exists(audio_file):
+        return False, f"Audio file {audio_file} missing."
+
+    try:
+        # Clean FFmpeg command
+        cmd = (
+            f'ffmpeg -y -loop 1 -i bg.jpg -i {audio_file} -c:v libx264 -tune stillimage '
+            f'-c:a aac -b:a 192k -pix_fmt yuv420p -vf "scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2" '
+            f'-shortest {output_mp4}'
+        )
+        res = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+        if res.returncode != 0:
+            return False, f"FFmpeg Error: {res.stderr[:150]}"
         print("MP4 Reel Video created successfully!")
-        return True
+        return True, "Success"
     except Exception as e:
         print(f"Error creating MP4 video: {e}")
-        return False
+        return False, f"FFmpeg Exception: {str(e)[:100]}"
 
 
 def upload_to_catbox(file_path):
@@ -85,7 +87,6 @@ def publish_reel_to_instagram(video_url, caption):
     if not INSTAGRAM_ACCOUNT_ID or not INSTAGRAM_ACCESS_TOKEN:
         return False, "Instagram Credentials Missing."
 
-    # Step 1: Create REELS Container
     create_url = f"{GRAPH_BASE}/{INSTAGRAM_ACCOUNT_ID}/media"
     payload = urllib.parse.urlencode({
         "media_type": "REELS",
@@ -105,7 +106,6 @@ def publish_reel_to_instagram(video_url, caption):
     except Exception as e:
         return False, f"Reel Container Exception: {str(e)}"
 
-    # Step 2: Poll container status until FINISHED
     status_url = f"{GRAPH_BASE}/{container_id}?fields=status_code&access_token={INSTAGRAM_ACCESS_TOKEN}"
     for _ in range(18):
         time.sleep(5)
@@ -122,7 +122,6 @@ def publish_reel_to_instagram(video_url, caption):
         except Exception:
             pass
 
-    # Step 3: Publish REELS Container
     publish_url = f"{GRAPH_BASE}/{INSTAGRAM_ACCOUNT_ID}/media_publish"
     pub_payload = urllib.parse.urlencode({
         "creation_id": container_id,
