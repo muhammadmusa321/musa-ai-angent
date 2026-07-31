@@ -2,7 +2,11 @@ import os
 import random
 import time
 from telegram_helper import send_telegram_message, send_telegram_photo, get_latest_message
-from ai_helper import load_persona, call_gemini_model, parse_post_sections, build_image_url, generate_comment_reply, MODEL_FALLBACK_ORDER
+from ai.persona_helper import load_persona
+from ai.gemini_helper import call_gemini_model, MODEL_FALLBACK_ORDER
+from ai.parser_helper import parse_post_sections
+from ai.image_prompt_helper import build_image_url
+from ai.comment_reply_helper import generate_comment_reply
 from sheets_helper import log_to_sheets, log_reply_to_sheets
 from instagram_helper import (
     publish_to_instagram,
