@@ -19,10 +19,10 @@ from reels.reel_helper import publish_reel_to_instagram
 OUR_USERNAME = "muhammad_musa125001"
 
 
-def generate_instagram_reel():
+def generate_instagram_reel(custom_topic=None):
     persona = load_persona()
     topics_list = persona.get("topics", ["AI Tools & Automation"])
-    chosen_topic = random.choice(topics_list)
+    chosen_topic = custom_topic if custom_topic else random.choice(topics_list)
 
     script_prompt = (
         f"Write a 15-second viral Instagram Reel script voiceover for '{chosen_topic}'. "
@@ -51,9 +51,9 @@ def generate_instagram_reel():
         return
 
     style_prefix = persona.get("image_style_prefix", "")
-    image_url = build_image_url(f"Vertical 1080x1920 poster for {chosen_topic}", style_prefix)
+    image_url = build_image_url(f"Vertical 1080x1920 poster for {chosen_topic}", style_prefix, headline=chosen_topic)
     
-    reel_created, r_err = build_reel_video(image_url, "voice.mp3", "reel.mp4")
+    reel_created, r_err = build_reel_video(image_url, "voice.mp3", "reel.mp4", headline=chosen_topic)
     if not reel_created:
         send_telegram_message(f"⚠️ Video Build Details: {r_err}")
         return
@@ -72,10 +72,10 @@ def generate_instagram_reel():
         send_telegram_message(f"⚠️ Reel Publishing Status: {reel_result}")
 
 
-def generate_instagram_post():
+def generate_instagram_post(custom_topic=None):
     persona = load_persona()
     topics_list = persona.get("topics", ["AI Tools & Automation"])
-    chosen_topic = random.choice(topics_list)
+    chosen_topic = custom_topic if custom_topic else random.choice(topics_list)
 
     prompt = (
         f"{persona.get('system_prompt', '')}\n\n"
@@ -97,7 +97,7 @@ def generate_instagram_post():
             photo_sent = False
             if sections.get("image_prompt"):
                 style_prefix = persona.get("image_style_prefix", "")
-                image_url = build_image_url(sections["image_prompt"], style_prefix)
+                image_url = build_image_url(sections["image_prompt"], style_prefix, headline=sections.get("headline"), caption_text=sections.get("caption"))
                 photo_sent = send_telegram_photo(image_url, caption=sections.get("headline", ""))
 
             logged = log_to_sheets("Create today's Instagram post", model, sections, image_url)
