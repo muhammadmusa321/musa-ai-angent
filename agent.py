@@ -3,12 +3,22 @@ import time
 from utils.telegram_helper import send_telegram_message, get_latest_message
 from utils.pipeline_helper import generate_instagram_post, generate_instagram_reel, reply_to_comments
 
+TOPIC_PREFIXES = ["topic:", "Topic:"]
+
+
+def extract_custom_topic(message):
+    stripped = message.strip()
+    lower = stripped.lower()
+    if lower.startswith("topic:"):
+        return stripped[len("topic:"):].strip()
+    return None
+
 
 def main():
     trigger_event = os.environ.get("TRIGGER_EVENT", "").strip()
 
     if trigger_event == "schedule":
-        send_telegram_message("⏰ 4-Hour Autopilot Triggered! Running Post + Reel + Comment Replies...")
+        send_telegram_message("⏰ Autopilot Triggered! Running Post + Reel + Comment Replies...")
         generate_instagram_post()
         time.sleep(5)
         generate_instagram_reel()
@@ -19,7 +29,17 @@ def main():
     message = get_latest_message()
     stripped_message = message.strip()
 
-    if stripped_message == "Create today's Instagram post":
+    custom_topic = extract_custom_topic(stripped_message)
+
+    if custom_topic is not None:
+        if not custom_topic:
+            send_telegram_message("⚠️ Please include a topic after 'Topic:', e.g. 'Topic: Top 3 Claude Prompts'.")
+            return
+        send_telegram_message(f"🎯 Custom Topic Recognized: \"{custom_topic}\"\nGenerating Post + Reel for this topic...")
+        generate_instagram_post(custom_topic=custom_topic)
+        time.sleep(5)
+        generate_instagram_reel(custom_topic=custom_topic)
+    elif stripped_message == "Create today's Instagram post":
         send_telegram_message("🤖 Command Recognized! Generating Instagram Post with AI Brain...")
         generate_instagram_post()
     elif stripped_message == "Create AI Reel":
