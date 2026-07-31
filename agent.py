@@ -8,13 +8,8 @@ from ai.parser_helper import parse_post_sections
 from ai.image_prompt_helper import build_image_url
 from ai.comment_reply_helper import generate_comment_reply
 from sheets_helper import log_to_sheets, log_reply_to_sheets
-from instagram_helper import (
-    publish_to_instagram,
-    get_recent_media,
-    get_comments_for_media,
-    has_our_reply,
-    reply_to_comment,
-)
+from instagram.post_helper import publish_to_instagram
+from instagram.comment_helper import get_recent_media, get_comments_for_media, has_our_reply, reply_to_comment
 from reels.voice_helper import create_voiceover
 from reels.video_helper import build_reel_video
 from reels.uploader_helper import upload_video_to_telegram_cdn
