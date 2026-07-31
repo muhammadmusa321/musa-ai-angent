@@ -11,7 +11,10 @@ from instagram_helper import (
     has_our_reply,
     reply_to_comment,
 )
-from reel_helper import create_voiceover, build_reel_video, upload_video_to_telegram_cdn, publish_reel_to_instagram
+from reels.voice_helper import create_voiceover
+from reels.video_helper import build_reel_video
+from reels.uploader_helper import upload_video_to_telegram_cdn
+from reels.reel_helper import publish_reel_to_instagram
 
 OUR_USERNAME = "muhammad_musa125001"
 
