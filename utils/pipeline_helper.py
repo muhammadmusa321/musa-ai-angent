@@ -52,8 +52,12 @@ def generate_instagram_reel(custom_topic=None):
 
     style_prefix = persona.get("image_style_prefix", "")
     image_url = build_image_url(f"Vertical 1080x1920 poster for {chosen_topic}", style_prefix, headline=chosen_topic)
-    
-    reel_created, r_err = build_reel_video(image_url, "voice.mp3", "reel.mp4", headline=chosen_topic)
+
+    reel_created, r_err = build_reel_video(
+        image_url, "voice.mp3", "reel.mp4",
+        headline=chosen_topic,
+        script_text=voiceover_text
+    )
     if not reel_created:
         send_telegram_message(f"⚠️ Video Build Details: {r_err}")
         return
