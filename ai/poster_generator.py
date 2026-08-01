@@ -1,4 +1,5 @@
 import os
+import re
 import textwrap
 import urllib.request
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
@@ -49,6 +50,70 @@ def _wrap_text(text, font, max_width, draw):
     return lines
 
 
+def extract_bullets_from_text(text, max_bullets=3, min_len=6, max_len=70):
+    """
+    Pulls short, poster-ready bullet points out of arbitrary AI-generated
+    text (a caption paragraph or a voiceover script).
+
+    Strategy:
+    1. First look for lines that already use bullet markers (•, -, *, or
+       "1." / "2)" numbering) -- these are the cleanest source when present.
+    2. If that yields fewer than `max_bullets`, fall back to splitting the
+       text into sentence-like clauses and using those -- this is what
+       actually fixes the bug, since Gemini often returns flowing
+       paragraphs with no literal bullet characters at all.
+    3. Never returns the old hardcoded placeholder text -- if truly
+       nothing usable is found, returns an empty list, and the caller
+       is responsible for a topic-aware fallback (never a generic one).
+    """
+    if not text:
+        return []
+
+    bullets = []
+
+    for line in text.splitlines():
+        stripped = line.strip()
+        cleaned = None
+
+        for marker in ("•", "-", "*"):
+            if stripped.startswith(marker):
+                cleaned = stripped[1:].strip()
+                break
+
+        if cleaned is None:
+            numbered = re.match(r"^\d+[\.\)]\s*(.+)", stripped)
+            if numbered:
+                cleaned = numbered.group(1).strip()
+
+        if cleaned and min_len <= len(cleaned) <= max_len:
+            bullets.append(cleaned)
+        elif cleaned and len(cleaned) > max_len:
+            trimmed = cleaned[:max_len - 3].rsplit(" ", 1)[0] + "..."
+            bullets.append(trimmed)
+
+        if len(bullets) >= max_bullets:
+            return bullets[:max_bullets]
+
+    # Fallback: sentence-level split, since most Gemini captions/scripts
+    # arrive as flowing prose rather than literal bulleted lines
+    raw = re.sub(r"\s+", " ", text).strip()
+    clauses = re.split(r"(?<=[.!?])\s+", raw)
+
+    for clause in clauses:
+        clause = clause.strip().strip("#").strip()
+        if not clause or len(clause) < min_len:
+            continue
+        if clause in bullets:
+            continue
+        if len(clause) > max_len:
+            clause = clause[:max_len - 3].rsplit(" ", 1)[0] + "..."
+        bullets.append(clause)
+        if len(bullets) >= max_bullets:
+            break
+
+    return bullets[:max_bullets]
+
+
 def _draw_glow_card(base_img, xy, size, radius=30):
     """Draws a soft glowing rounded rectangle card behind content."""
     x, y = xy
@@ -79,7 +144,6 @@ def _draw_glow_card(base_img, xy, size, radius=30):
 def _background(size):
     img = Image.new("RGBA", size, (*NAVY_BG, 255))
     draw = ImageDraw.Draw(img)
-    # Subtle vertical gradient for depth
     for i in range(size[1]):
         blend = i / size[1]
         r = int(NAVY_BG[0] + (NAVY_BG_LIGHT[0] - NAVY_BG[0]) * blend)
@@ -91,14 +155,6 @@ def _background(size):
 
 def generate_poster(headline, bullets, output_path, size=(1080, 1080),
                      handle="@muhammad_musa125001", cta_text="💾 Save this for later"):
-    """
-    Draws a clean text infographic poster:
-    - Bold white/orange wrapped headline at top
-    - Glowing rounded cards, one per bullet point
-    - CTA line
-    - Handle pinned at bottom
-    Works for both square (1080x1080) and vertical (1080x1920) via `size`.
-    """
     _ensure_fonts()
 
     width, height = size
@@ -108,7 +164,6 @@ def generate_poster(headline, bullets, output_path, size=(1080, 1080),
     margin = int(width * 0.08)
     content_width = width - (margin * 2)
 
-    # Scale font sizes relative to width so the same code works for both formats
     headline_font_size = int(width * 0.075)
     bullet_font_size = int(width * 0.042)
     cta_font_size = int(width * 0.038)
@@ -119,10 +174,9 @@ def generate_poster(headline, bullets, output_path, size=(1080, 1080),
     cta_font = _load_font(FONT_REGULAR_PATH, cta_font_size)
     handle_font = _load_font(FONT_BOLD_PATH, handle_font_size)
 
-    # --- Headline ---
     y_cursor = int(height * 0.07)
     headline_lines = _wrap_text(headline.upper(), headline_font, content_width, draw)
-    for i, line in enumerate(headline_lines[:3]):  # cap at 3 lines to avoid overflow
+    for i, line in enumerate(headline_lines[:3]):
         color = ORANGE if i == len(headline_lines[:3]) - 1 else WHITE
         bbox = draw.textbbox((0, 0), line, font=headline_font)
         line_h = bbox[3] - bbox[1]
@@ -131,11 +185,10 @@ def generate_poster(headline, bullets, output_path, size=(1080, 1080),
 
     y_cursor += int(height * 0.04)
 
-    # --- Bullet cards ---
-    max_bullets = 4 if size[1] > size[0] else 3  # a bit more room on vertical reels
+    max_bullets = 4 if size[1] > size[0] else 3
     bullets_to_show = bullets[:max_bullets] if bullets else []
 
-    available_height = height - y_cursor - int(height * 0.18)  # leave room for CTA + handle
+    available_height = height - y_cursor - int(height * 0.18)
     card_gap = int(height * 0.025)
     card_height = (available_height - (card_gap * max(0, len(bullets_to_show) - 1))) // max(1, len(bullets_to_show))
     card_height = min(card_height, int(height * 0.14))
@@ -150,19 +203,17 @@ def generate_poster(headline, bullets, output_path, size=(1080, 1080),
         text_y = y_cursor + (card_height - text_block_h) / 2
 
         draw = ImageDraw.Draw(img)
-        for line in text_lines[:2]:  # cap 2 lines per card to keep it clean
+        for line in text_lines[:2]:
             draw.text((margin + int(width * 0.03), text_y), line, font=bullet_font, fill=WHITE)
             text_y += line_h * 1.3
 
         y_cursor += card_height + card_gap
 
-    # --- CTA ---
     cta_y = height - int(height * 0.13)
     cta_bbox = draw.textbbox((0, 0), cta_text, font=cta_font)
     cta_w = cta_bbox[2] - cta_bbox[0]
     draw.text(((width - cta_w) / 2, cta_y), cta_text, font=cta_font, fill=ORANGE)
 
-    # --- Handle ---
     handle_y = height - int(height * 0.07)
     handle_bbox = draw.textbbox((0, 0), handle, font=handle_font)
     handle_w = handle_bbox[2] - handle_bbox[0]
