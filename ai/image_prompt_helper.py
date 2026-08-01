@@ -3,7 +3,7 @@ import os
 import random
 import urllib.request
 import urllib.parse
-from ai.poster_generator import generate_square_poster
+from ai.poster_generator import generate_square_poster, extract_bullets_from_text
 
 BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
 CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "").strip()
@@ -27,17 +27,17 @@ def upload_photo_to_telegram_cdn(file_path):
         req = urllib.request.Request(url, data=payload, headers={"Content-Type": f"multipart/form-data; boundary={boundary}"})
         with urllib.request.urlopen(req, timeout=30) as resp:
             data = json.loads(resp.read().decode("utf-8"))
-        
+
         photos = data.get("result", {}).get("photo", [])
         if not photos:
             return None
-        
+
         file_id = photos[-1].get("file_id")
-        
+
         get_file_url = f"https://api.telegram.org/bot{BOT_TOKEN}/getFile?file_id={file_id}"
         with urllib.request.urlopen(get_file_url, timeout=30) as f_resp:
             f_data = json.loads(f_resp.read().decode("utf-8"))
-        
+
         file_path_on_tg = f_data["result"]["file_path"]
         public_url = f"https://api.telegram.org/file/bot{BOT_TOKEN}/{file_path_on_tg}"
         print(f"Telegram CDN Public Photo URL: {public_url}")
@@ -49,24 +49,23 @@ def upload_photo_to_telegram_cdn(file_path):
 
 def build_image_url(image_prompt, style_prefix="", headline="", caption_text=""):
     try:
-        bullets = []
-        if caption_text:
-            for l in caption_text.splitlines():
-                l_strip = l.strip()
-                if l_strip.startswith("•") or l_strip.startswith("-") or l_strip.startswith("*"):
-                    bullets.append(l_strip)
-        
+        bullets = extract_bullets_from_text(caption_text, max_bullets=3)
+
         if not bullets:
+            # Topic-aware fallback (never the old generic hardcoded claims) --
+            # uses the headline itself so the poster still reflects this
+            # specific post even in the worst case where parsing finds nothing.
+            fallback_topic = headline if headline else "This Update"
             bullets = [
-                "• 10x Content Output with AI Workers",
-                "• No Coding Required & Fast Setup",
-                "• Automate Repetitive Daily Tasks"
+                f"Key insight on {fallback_topic}",
+                "Swipe to learn more",
+                "Follow for daily AI tips"
             ]
+            print("Bullet extraction found nothing usable -- using topic-aware fallback.")
 
         poster_title = headline if headline else "AI AUTOMATION UPDATE"
         local_path = generate_square_poster(poster_title, bullets, output_path="infographic.png")
-        
-        # Convert local image to public URL for Meta API
+
         public_url = upload_photo_to_telegram_cdn(local_path)
         if public_url:
             return public_url
