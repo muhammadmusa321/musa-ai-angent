@@ -5,7 +5,7 @@ import urllib.request
 import urllib.error
 
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "").strip()
-MODEL_FALLBACK_ORDER = ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-flash-lite-latest"]
+MODEL_FALLBACK_ORDER = ["gemini-2.0-flash", "gemini-1.5-flash-latest", "gemini-flash-lite-latest"]
 MAX_RETRIES_PER_MODEL = 3
 BASE_BACKOFF_SECONDS = 5
 
@@ -23,7 +23,7 @@ def call_gemini_model(model, prompt):
             if e.code == 429 and attempt < MAX_RETRIES_PER_MODEL:
                 time.sleep(BASE_BACKOFF_SECONDS * (2 ** (attempt - 1)))
                 continue
-            raise RuntimeError(f"{model} failed HTTP {e.code}")
+            raise RuntimeError(f"{model} HTTP {e.code}")
         except Exception as e:
             if attempt < MAX_RETRIES_PER_MODEL:
                 time.sleep(BASE_BACKOFF_SECONDS)
