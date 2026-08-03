@@ -20,7 +20,7 @@ def upload_photo_to_telegram_cdn(file_path):
 
         body = []
         body.append(f"--{boundary}\r\nContent-Disposition: form-data; name=\"chat_id\"\r\n\r\n{CHAT_ID}".encode("utf-8"))
-        body.append(f"--{boundary}\r\nContent-Disposition: form-data; name=\"photo\"; filename=\"infographic.png\"\r\nContent-Type: image/png\r\n\r\n".encode("utf-8") + file_bytes)
+        body.append(f"--{boundary}\r\nContent-Disposition: form-data; name=\"photo\"; filename=\"infographic.jpg\"\r\nContent-Type: image/jpeg\r\n\r\n".encode("utf-8") + file_bytes)
         body.append(f"--{boundary}--\r\n".encode("utf-8"))
         payload = b"\r\n".join(body)
 
@@ -64,7 +64,7 @@ def build_image_url(image_prompt, style_prefix="", headline="", caption_text="")
             print("Bullet extraction found nothing usable -- using topic-aware fallback.")
 
         poster_title = headline if headline else "AI AUTOMATION UPDATE"
-        local_path = generate_square_poster(poster_title, bullets, output_path="infographic.png")
+        local_path = generate_square_poster(poster_title, bullets, output_path="infographic.jpg")
 
         public_url = upload_photo_to_telegram_cdn(local_path)
         if public_url:
