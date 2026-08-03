@@ -22,6 +22,10 @@ def get_recent_media(limit=5):
         return []
 
 def get_comments_for_media(media_id):
+    if not INSTAGRAM_ACCESS_TOKEN:
+        print("Error fetching comments: Instagram Access Token Missing.")
+        return []
+
     url = f"{GRAPH_BASE}/{media_id}/comments?fields=id,text,username,replies{{id,text,username}}&access_token={INSTAGRAM_ACCESS_TOKEN}"
     try:
         req = urllib.request.Request(url)
