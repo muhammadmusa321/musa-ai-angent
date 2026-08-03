@@ -6,7 +6,7 @@ import urllib.parse
 import urllib.error
 
 from nacl import encoding, public
-from telegram_helper import send_telegram_message
+from utils.telegram_helper import send_telegram_message
 
 INSTAGRAM_APP_ID = os.environ["INSTAGRAM_APP_ID"]
 INSTAGRAM_APP_SECRET = os.environ["INSTAGRAM_APP_SECRET"]
