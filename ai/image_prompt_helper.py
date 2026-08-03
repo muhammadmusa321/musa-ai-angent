@@ -1,6 +1,5 @@
 import json
 import os
-import random
 import urllib.request
 import urllib.parse
 from ai.poster_generator import generate_square_poster, extract_bullets_from_text
@@ -64,13 +63,14 @@ def build_image_url(image_prompt, style_prefix="", headline="", caption_text="")
             print("Bullet extraction found nothing usable -- using topic-aware fallback.")
 
         poster_title = headline if headline else "AI AUTOMATION UPDATE"
-        local_path = generate_square_poster(poster_title, bullets, output_path="infographic.jpg")
+        full_prompt = f"{style_prefix} {image_prompt}".strip() if image_prompt else style_prefix
+        local_path = generate_square_poster(poster_title, bullets, output_path="infographic.jpg", image_prompt=full_prompt)
 
         public_url = upload_photo_to_telegram_cdn(local_path)
         if public_url:
             return public_url
         return local_path
     except Exception as e:
-        print(f"Pillow Poster Generation Fallback: {e}")
-        encoded_prompt = urllib.parse.quote(image_prompt[:200])
+        print(f"Poster Generation Fallback: {e}")
+        encoded_prompt = urllib.parse.quote((image_prompt or headline or "AI technology")[:200])
         return f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=1024&nologo=true&model=flux"
