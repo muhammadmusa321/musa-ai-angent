@@ -2,7 +2,7 @@ import os
 import subprocess
 from ai.poster_generator import generate_vertical_poster
 
-def build_reel_video(image_url, audio_file="voice.mp3", output_mp4="reel.mp4", headline="AI REEL UPDATE"):
+def build_reel_video(image_url, audio_file="voice.mp3", output_mp4="reel.mp4", headline="AI REEL UPDATE", script_text=None):
     try:
         bullets = [
             "• 10x Content Output with AI",
