@@ -73,12 +73,15 @@ def _generate_infographic_core(headline, bullets, output_path, handle="@muhammad
     draw.text((60, height - 120), "SAVE for later 📌  |  Comment below ⬇️", fill=(255, 153, 51), font=font_small)
     draw.text((60, height - 60), handle, fill=(150, 160, 180), font=font_small)
 
+    # Always saved as JPEG regardless of the extension in output_path -- callers
+    # should pass a .jpg path to keep the filename consistent with the actual
+    # file content.
     img.save(output_path, "JPEG", quality=95)
     print(f"Generated Clean Text Infographic: {output_path}")
     return output_path
 
 
-def generate_square_poster(headline, bullets, output_path="infographic.png", handle="@muhammad_musa125001"):
+def generate_square_poster(headline, bullets, output_path="infographic.jpg", handle="@muhammad_musa125001"):
     return _generate_infographic_core(headline, bullets, output_path, handle=handle, is_vertical=False)
 
 
