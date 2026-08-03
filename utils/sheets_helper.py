@@ -21,7 +21,10 @@ def log_to_sheets(command, model, sections, image_url):
     try:
         req = urllib.request.Request(SHEETS_WEBHOOK_URL, data=payload, headers={"Content-Type": "application/json"})
         with urllib.request.urlopen(req, timeout=30) as resp:
-            resp.read()
+            body = resp.read()
+            if resp.status != 200:
+                print(f"Sheets webhook returned status {resp.status}: {body[:200]}")
+                return False
         return True
     except Exception as e:
         print(f"ERROR logging to Sheets: {e}")
@@ -42,7 +45,10 @@ def log_reply_to_sheets(media_id, comment_id, commenter_username, comment_text, 
     try:
         req = urllib.request.Request(SHEETS_WEBHOOK_URL, data=payload, headers={"Content-Type": "application/json"})
         with urllib.request.urlopen(req, timeout=30) as resp:
-            resp.read()
+            body = resp.read()
+            if resp.status != 200:
+                print(f"Sheets webhook returned status {resp.status}: {body[:200]}")
+                return False
         return True
     except Exception as e:
         print(f"ERROR logging reply to Sheets: {e}")
